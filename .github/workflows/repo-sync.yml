@@ -38,7 +38,7 @@ jobs:
             -e GITHUB_PAT=${{ secrets.GH_PAT }} \
             -e NOTION_API_KEY=${{ secrets.NOTION_API_KEY }} \
             n8nio/n8n:latest \
-            n8n execute --file /home/node/.n8n/workflows/repo-analysis-sync.json \
+            execute --file /home/node/.n8n/workflows/repo-analysis-sync.json \
             2>&1 | tee /tmp/n8n-output.log
           echo "exit_code=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
 
