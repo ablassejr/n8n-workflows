@@ -1,0 +1,77 @@
+name: Repository Analysis & Notion Sync
+
+on:
+  schedule:
+    # Run at 12:00 AM and 12:00 PM UTC daily
+    - cron: "0 0,12 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Bootstrap n8n credentials
+        run: |
+          chmod +x scripts/setup-credentials.sh
+          GITHUB_PAT="${{ secrets.GH_PAT }}" \
+          NOTION_API_KEY="${{ secrets.NOTION_API_KEY }}" \
+          CRED_DIR="$(pwd)/credentials" \
+          ./scripts/setup-credentials.sh
+
+      - name: Execute n8n workflow
+        id: run_workflow
+        run: |
+          docker run --rm \
+            -v "$(pwd)/workflows:/home/node/.n8n/workflows" \
+            -v "$(pwd)/credentials:/home/node/.n8n/credentials" \
+            --env-file config/n8n-config.env \
+            -e N8N_ENCRYPTION_KEY=${{ secrets.N8N_ENCRYPTION_KEY }} \
+            -e GITHUB_PAT=${{ secrets.GH_PAT }} \
+            -e NOTION_API_KEY=${{ secrets.NOTION_API_KEY }} \
+            n8nio/n8n:latest \
+            n8n execute --file /home/node/.n8n/workflows/repo-analysis-sync.json \
+            2>&1 | tee /tmp/n8n-output.log
+          echo "exit_code=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
+
+      - name: Display workflow output
+        if: always()
+        run: |
+          echo "=== n8n Workflow Output ==="
+          cat /tmp/n8n-output.log || echo "No output file found"
+          echo "=== End Output ==="
+
+      - name: Create failure issue
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const date = new Date().toISOString().split('T')[0];
+            const body = [
+              `## Repo Sync Failed: ${date}`,
+              '',
+              'The scheduled repository analysis and Notion sync workflow failed.',
+              '',
+              '**Run URL:** ' + context.serverUrl + '/' + context.repo.owner + '/' + context.repo.repo + '/actions/runs/' + context.runId,
+              '',
+              'Please check the workflow logs for details.',
+            ].join('\n');
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `Repo Sync Failed: ${date}`,
+              body: body,
+              labels: ['automation', 'bug']
+            });
+
+      - name: Clean up credentials
+        if: always()
+        run: rm -rf credentials/

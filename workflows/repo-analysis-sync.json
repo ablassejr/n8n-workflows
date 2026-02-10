@@ -1,0 +1,827 @@
+{
+  "name": "Repository Analysis & Notion Sync",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "start-node",
+      "name": "Start",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [0, 300]
+    },
+    {
+      "parameters": {
+        "url": "https://api.github.com/users/ablassejr/repos",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "per_page", "value": "100" },
+            { "name": "type", "value": "all" }
+          ]
+        },
+        "options": {
+          "response": { "response": { "fullResponse": false } }
+        }
+      },
+      "id": "fetch-user-repos",
+      "name": "Fetch User Repos",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [250, 200],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "1",
+          "name": "github_pat"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "url": "https://api.github.com/orgs/PulseframeOS/repos",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "per_page", "value": "100" },
+            { "name": "type", "value": "all" }
+          ]
+        },
+        "options": {
+          "response": { "response": { "fullResponse": false } }
+        }
+      },
+      "id": "fetch-org-repos",
+      "name": "Fetch Org Repos",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [250, 450],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "1",
+          "name": "github_pat"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "functionCode": "// Merge user and org repos, filter out archived\nconst userRepos = $items('Fetch User Repos').map(i => i.json);\nconst orgReposRaw = $items('Fetch Org Repos').map(i => i.json);\n\n// Handle cases where the API returns arrays or single objects\nlet allUserRepos = Array.isArray(userRepos[0]) ? userRepos[0] : userRepos;\nlet allOrgRepos = Array.isArray(orgReposRaw[0]) ? orgReposRaw[0] : orgReposRaw;\n\n// Merge and filter archived\nconst allRepos = [...allUserRepos, ...allOrgRepos].filter(r => !r.archived);\n\n// Deduplicate by full_name\nconst seen = new Set();\nconst uniqueRepos = allRepos.filter(r => {\n  if (!r.full_name || seen.has(r.full_name)) return false;\n  seen.add(r.full_name);\n  return true;\n});\n\n// Tag each repo with source info\nreturn uniqueRepos.map(repo => ({\n  json: {\n    name: repo.name,\n    full_name: repo.full_name,\n    description: repo.description || '',\n    language: repo.language || 'Unknown',\n    default_branch: repo.default_branch || 'main',\n    visibility: repo.private ? 'private' : 'public',\n    created_at: repo.created_at,\n    updated_at: repo.updated_at,\n    pushed_at: repo.pushed_at,\n    html_url: repo.html_url,\n    open_issues_count: repo.open_issues_count || 0,\n    stargazers_count: repo.stargazers_count || 0,\n    homepage: repo.homepage || '',\n    has_wiki: repo.has_wiki || false,\n    has_pages: repo.has_pages || false,\n    owner_type: repo.owner?.type === 'Organization' ? 'org' : 'user',\n    owner_login: repo.owner?.login || '',\n    is_org_repo: repo.owner?.login === 'PulseframeOS'\n  }\n}));"
+      },
+      "id": "merge-filter-repos",
+      "name": "Merge & Filter Repos",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [500, 300]
+    },
+    {
+      "parameters": {
+        "batchSize": 5,
+        "options": {
+          "reset": false
+        }
+      },
+      "id": "batch-repos",
+      "name": "Batch Repos",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [750, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Wait 1 second for rate limiting\nawait new Promise(resolve => setTimeout(resolve, 1000));\nreturn $input.all();"
+      },
+      "id": "rate-limit-wait",
+      "name": "Rate Limit Wait",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [1000, 300]
+    },
+    {
+      "parameters": {
+        "url": "=https://api.github.com/repos/{{ $json.full_name }}/commits",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "per_page", "value": "30" },
+            { "name": "since", "value": "={{ new Date(Date.now() - 7*24*60*60*1000).toISOString() }}" }
+          ]
+        },
+        "options": {
+          "response": { "response": { "fullResponse": false } }
+        }
+      },
+      "id": "fetch-recent-commits",
+      "name": "Fetch Recent Commits",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1250, 100],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "1",
+          "name": "github_pat"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "url": "=https://api.github.com/repos/{{ $json.full_name }}/issues",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "state", "value": "open" },
+            { "name": "per_page", "value": "100" }
+          ]
+        },
+        "options": {
+          "response": { "response": { "fullResponse": false } }
+        }
+      },
+      "id": "fetch-open-issues",
+      "name": "Fetch Open Issues",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1250, 300],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "1",
+          "name": "github_pat"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "url": "=https://api.github.com/repos/{{ $json.full_name }}/pulls",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "state", "value": "open" },
+            { "name": "per_page", "value": "100" }
+          ]
+        },
+        "options": {
+          "response": { "response": { "fullResponse": false } }
+        }
+      },
+      "id": "fetch-open-prs",
+      "name": "Fetch Open PRs",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1250, 500],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "1",
+          "name": "github_pat"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "url": "=https://api.github.com/repos/{{ $json.full_name }}/languages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "response": { "response": { "fullResponse": false } }
+        }
+      },
+      "id": "fetch-languages",
+      "name": "Fetch Languages",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1250, 700],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "1",
+          "name": "github_pat"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "url": "=https://api.github.com/repos/{{ $json.full_name }}/branches",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "per_page", "value": "100" }
+          ]
+        },
+        "options": {
+          "response": { "response": { "fullResponse": false } }
+        }
+      },
+      "id": "fetch-branches",
+      "name": "Fetch Branches",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1250, 900],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "1",
+          "name": "github_pat"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "url": "=https://api.github.com/repos/{{ $json.full_name }}/releases/latest",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "response": { "response": { "fullResponse": false } }
+        }
+      },
+      "id": "fetch-latest-release",
+      "name": "Fetch Latest Release",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1250, 1100],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "1",
+          "name": "github_pat"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "url": "=https://api.github.com/repos/{{ $json.full_name }}/contents/",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "response": { "response": { "fullResponse": false } }
+        }
+      },
+      "id": "fetch-root-contents",
+      "name": "Fetch Root Contents",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1250, 1300],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "1",
+          "name": "github_pat"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "functionCode": "// Aggregate all per-repo data into a single enriched repo object\nconst repo = $items('Rate Limit Wait')[0].json;\nconst commitsRaw = $items('Fetch Recent Commits').map(i => i.json);\nconst issuesRaw = $items('Fetch Open Issues').map(i => i.json);\nconst prsRaw = $items('Fetch Open PRs').map(i => i.json);\nconst languagesRaw = $items('Fetch Languages')[0]?.json || {};\nconst branchesRaw = $items('Fetch Branches').map(i => i.json);\nconst releaseRaw = $items('Fetch Latest Release')[0]?.json || {};\nconst contentsRaw = $items('Fetch Root Contents').map(i => i.json);\n\n// Parse commits\nconst commits = Array.isArray(commitsRaw[0]) ? commitsRaw[0] : commitsRaw;\nconst recentCommitCount = Array.isArray(commits) ? commits.filter(c => c.sha).length : 0;\nconst latestCommit = Array.isArray(commits) && commits.length > 0 && commits[0].commit\n  ? { message: commits[0].commit.message, author: commits[0].commit.author?.name || 'unknown' }\n  : null;\n\n// Parse issues (filter out PRs — GitHub API returns PRs as issues too)\nconst issues = (Array.isArray(issuesRaw[0]) ? issuesRaw[0] : issuesRaw)\n  .filter(i => i.number && !i.pull_request);\nconst openIssues = issues.map(i => ({\n  number: i.number,\n  title: i.title,\n  labels: (i.labels || []).map(l => typeof l === 'string' ? l : l.name),\n  assignees: (i.assignees || []).map(a => a.login),\n  milestone_due: i.milestone?.due_on || null,\n  state: i.state\n}));\n\n// Parse PRs\nconst prs = Array.isArray(prsRaw[0]) ? prsRaw[0] : prsRaw;\nconst openPRs = (Array.isArray(prs) ? prs : []).filter(p => p.number).map(p => ({\n  number: p.number,\n  title: p.title,\n  author: p.user?.login || 'unknown',\n  draft: p.draft || false\n}));\n\n// Parse languages\nconst languages = languagesRaw.message ? {} : languagesRaw;\n\n// Parse branches\nconst branches = Array.isArray(branchesRaw[0]) ? branchesRaw[0] : branchesRaw;\nconst branchCount = Array.isArray(branches) ? branches.filter(b => b.name).length : 0;\n\n// Parse latest release\nconst latestRelease = releaseRaw.tag_name ? releaseRaw.tag_name : null;\n\n// Parse root contents for health checks and key files\nconst contents = Array.isArray(contentsRaw[0]) ? contentsRaw[0] : contentsRaw;\nconst fileNames = Array.isArray(contents) ? contents.filter(c => c.name).map(c => c.name) : [];\nconst dirNames = Array.isArray(contents) ? contents.filter(c => c.type === 'dir').map(c => c.name) : [];\n\nconst hasReadme = fileNames.some(f => f.toLowerCase().startsWith('readme'));\nconst hasLicense = fileNames.some(f => f.toLowerCase().startsWith('license'));\nconst hasCIDir = dirNames.includes('.github') || fileNames.some(f => f === '.github');\nconst hasDocsDir = dirNames.includes('docs');\nconst hasScriptsDir = dirNames.includes('scripts');\nconst hasWiki = repo.has_wiki;\n\n// Key config files\nconst configFiles = ['package.json', 'pyproject.toml', 'Dockerfile', 'docker-compose.yml',\n  'docker-compose.yaml', 'Makefile', '.eslintrc.json', '.eslintrc.js', 'tsconfig.json',\n  'requirements.txt', 'Cargo.toml', 'go.mod', '.prettierrc', 'jest.config.js',\n  'vitest.config.ts', '.env.example'];\nconst foundConfigFiles = fileNames.filter(f => configFiles.includes(f));\n\n// CI config files and notable snippet-worthy files\nconst snippetCandidates = [];\nif (hasScriptsDir) {\n  snippetCandidates.push({ type: 'directory', name: 'scripts/', path: 'scripts' });\n}\nfor (const cf of ['Dockerfile', 'docker-compose.yml', 'docker-compose.yaml', 'Makefile']) {\n  if (fileNames.includes(cf)) {\n    snippetCandidates.push({\n      type: 'file',\n      name: cf,\n      url: `https://github.com/${repo.full_name}/blob/${repo.default_branch}/${cf}`\n    });\n  }\n}\n// Check for CI workflows\nif (hasCIDir) {\n  snippetCandidates.push({\n    type: 'directory',\n    name: '.github/workflows/',\n    path: '.github/workflows'\n  });\n}\n\n// Determine project type\nlet projectType = 'unknown';\nif (fileNames.includes('package.json')) projectType = 'node';\nelse if (fileNames.includes('pyproject.toml') || fileNames.includes('requirements.txt')) projectType = 'python';\nelse if (fileNames.includes('Cargo.toml')) projectType = 'rust';\nelse if (fileNames.includes('go.mod')) projectType = 'go';\nelse if (repo.language) projectType = repo.language.toLowerCase();\n\n// Calculate activity status\nconst now = new Date();\nconst updatedAt = new Date(repo.pushed_at || repo.updated_at);\nconst daysSinceUpdate = Math.floor((now - updatedAt) / (1000 * 60 * 60 * 24));\n\nreturn [{\n  json: {\n    ...repo,\n    recentCommitCount,\n    latestCommit,\n    openIssues,\n    openIssueCount: openIssues.length,\n    openPRs,\n    openPRCount: openPRs.length,\n    languages,\n    branchCount,\n    latestRelease,\n    health: {\n      hasReadme,\n      hasLicense,\n      hasCI: hasCIDir,\n      hasDocs: hasDocsDir,\n      hasWiki\n    },\n    projectType,\n    foundConfigFiles,\n    snippetCandidates,\n    hasScriptsDir,\n    hasDocsDir,\n    daysSinceUpdate,\n    externalLinks: {\n      homepage: repo.homepage || null,\n      docsUrl: hasDocsDir ? `https://github.com/${repo.full_name}/tree/${repo.default_branch}/docs` : null,\n      wikiUrl: hasWiki ? `https://github.com/${repo.full_name}/wiki` : null\n    }\n  }\n}];"
+      },
+      "id": "aggregate-repo-data",
+      "name": "Aggregate Repo Data",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [1550, 600]
+    },
+    {
+      "parameters": {
+        "url": "https://api.notion.com/v1/databases/303ea6baeea781ed9aeeeb42901b05c2/query",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "method": "POST",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "filter",
+              "value": "={{ JSON.stringify({ property: 'Repository URL', url: { equals: $json.html_url } }) }}"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Notion-Version", "value": "2022-06-28" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "query-existing-project",
+      "name": "Query Existing Project",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1850, 600],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "2",
+          "name": "notion_integration"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "functionCode": "// Decide: create new project or update existing\nconst repo = $items('Aggregate Repo Data')[0].json;\nconst queryResult = $items('Query Existing Project')[0].json;\n\nconst existingPages = queryResult.results || [];\nconst existingProject = existingPages.length > 0 ? existingPages[0] : null;\n\n// Determine desired status\nlet desiredStatus;\nif (existingProject) {\n  const currentStatus = existingProject.properties?.Status?.status?.name || 'Inbox';\n  if (repo.recentCommitCount > 0 && (currentStatus === 'Paused' || currentStatus === 'Inbox')) {\n    desiredStatus = 'In progress';\n  } else if (repo.daysSinceUpdate > 30 && currentStatus === 'In progress') {\n    desiredStatus = 'Paused';\n  } else {\n    desiredStatus = currentStatus;\n  }\n} else {\n  desiredStatus = repo.recentCommitCount > 0 ? 'In progress' : 'Inbox';\n}\n\nconst priority = repo.is_org_repo ? 'High' : 'Medium';\n\n// Get existing relations\nconst existingTaskRelations = existingProject?.properties?.Tasks?.relation || [];\nconst existingResourceRelations = existingProject?.properties?.Resources?.relation || [];\nconst existingSnippetRelations = existingProject?.properties?.Snippets?.relation || [];\nconst existingCourseRelation = existingProject?.properties?.Course?.relation || [];\n\nreturn [{\n  json: {\n    ...repo,\n    existingProjectId: existingProject?.id || null,\n    existingProjectPageUrl: existingProject?.url || null,\n    isNewProject: !existingProject,\n    desiredStatus,\n    priority,\n    existingTaskRelations,\n    existingResourceRelations,\n    existingSnippetRelations,\n    existingCourseRelation\n  }\n}];"
+      },
+      "id": "decide-project-action",
+      "name": "Decide Project Action",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [2100, 600]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.isNewProject }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "if-new-project",
+      "name": "IF New Project",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [2350, 600]
+    },
+    {
+      "parameters": {
+        "url": "https://api.notion.com/v1/pages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "method": "POST",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ parent: { database_id: '303ea6baeea781ed9aeeeb42901b05c2' }, properties: { Name: { title: [{ text: { content: $json.name } }] }, Status: { status: { name: $json.desiredStatus } }, Priority: { select: { name: $json.priority } }, 'Repository URL': { url: $json.html_url }, Start: { date: { start: $json.created_at ? $json.created_at.substring(0,10) : null } } } }) }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Notion-Version", "value": "2022-06-28" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "create-project",
+      "name": "Create Project",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2600, 450],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "2",
+          "name": "notion_integration"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "url": "=https://api.notion.com/v1/pages/{{ $json.existingProjectId }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "method": "PATCH",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ properties: { Status: { status: { name: $json.desiredStatus } }, 'Repository URL': { url: $json.html_url } } }) }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Notion-Version", "value": "2022-06-28" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "update-project",
+      "name": "Update Project",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2600, 750],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "2",
+          "name": "notion_integration"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "functionCode": "// After create or update, consolidate project ID and prepare for child entity sync\nconst repoData = $items('Decide Project Action')[0].json;\n\nlet projectId;\nlet projectUrl;\n\nif (repoData.isNewProject) {\n  const created = $items('Create Project')[0]?.json;\n  projectId = created?.id || null;\n  projectUrl = created?.url || null;\n} else {\n  projectId = repoData.existingProjectId;\n  projectUrl = repoData.existingProjectPageUrl;\n  // Also check for update result\n  const updated = $items('Update Project')[0]?.json;\n  if (updated?.id) {\n    projectId = updated.id;\n    projectUrl = updated.url || projectUrl;\n  }\n}\n\nreturn [{\n  json: {\n    ...repoData,\n    projectNotionId: projectId,\n    projectNotionUrl: projectUrl\n  }\n}];"
+      },
+      "id": "consolidate-project",
+      "name": "Consolidate Project",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [2900, 600]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Prepare tasks from open issues for this repo\nconst repo = $json;\nconst projectId = repo.projectNotionId;\nconst courseRelation = repo.existingCourseRelation || [];\n\nif (!projectId) {\n  return [{ json: { ...repo, tasksToCreate: [], tasksToClose: [], taskSyncSkipped: true } }];\n}\n\nconst issues = repo.openIssues || [];\n\n// We'll need to query existing tasks — prepare the query filter\n// For now, pass issues forward for the next node to process\nreturn [{\n  json: {\n    ...repo,\n    issuesToSync: issues,\n    courseRelationForChildren: courseRelation\n  }\n}];"
+      },
+      "id": "prepare-tasks",
+      "name": "Prepare Tasks",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [3150, 600]
+    },
+    {
+      "parameters": {
+        "url": "https://api.notion.com/v1/databases/303ea6baeea781eb874ad3a7a4af55df/query",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "method": "POST",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ filter: { property: 'Name', title: { starts_with: $json.name + ' #' } } }) }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Notion-Version", "value": "2022-06-28" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "query-existing-tasks",
+      "name": "Query Existing Tasks",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [3400, 600],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "2",
+          "name": "notion_integration"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "functionCode": "// Diff issues against existing tasks, create new tasks, mark closed ones\nconst repo = $items('Prepare Tasks')[0].json;\nconst queryResult = $items('Query Existing Tasks')[0].json;\nconst existingTasks = queryResult.results || [];\nconst projectId = repo.projectNotionId;\nconst courseRelation = repo.courseRelationForChildren || [];\n\n// Build lookup of existing tasks by issue number pattern\nconst existingTaskMap = {};\nfor (const task of existingTasks) {\n  const title = task.properties?.Name?.title?.[0]?.plain_text || '';\n  const match = title.match(/#(\\d+):/);\n  if (match) {\n    existingTaskMap[match[1]] = {\n      id: task.id,\n      url: task.url,\n      title: title,\n      status: task.properties?.Status?.status?.name || 'Inbox'\n    };\n  }\n}\n\n// Map GitHub labels to Notion Task types\nfunction mapLabelsToType(labels) {\n  const labelNames = labels.map(l => l.toLowerCase());\n  if (labelNames.includes('bug')) return 'Bug Fix';\n  if (labelNames.includes('enhancement') || labelNames.includes('feature')) return 'Feature';\n  if (labelNames.includes('improvement') || labelNames.includes('improve')) return 'Improve';\n  if (labelNames.includes('automation')) return 'Automation';\n  if (labelNames.includes('ui') || labelNames.includes('design')) return 'UI';\n  if (labelNames.includes('setup') || labelNames.includes('infrastructure')) return 'Setup';\n  if (labelNames.includes('wireframe')) return 'Wireframe';\n  if (labelNames.includes('connection') || labelNames.includes('integration')) return 'Connection';\n  return 'Feature';\n}\n\nconst tasksToCreate = [];\nconst existingTaskIds = [];\n\nfor (const issue of (repo.issuesToSync || [])) {\n  const issueNum = String(issue.number);\n  if (existingTaskMap[issueNum]) {\n    existingTaskIds.push(existingTaskMap[issueNum].id);\n    continue;\n  }\n\n  const taskName = `${repo.name} #${issue.number}: ${issue.title}`;\n  const taskStatus = issue.assignees && issue.assignees.length > 0 ? 'In progress' : 'Inbox';\n  const taskType = mapLabelsToType(issue.labels || []);\n  const dueDate = issue.milestone_due ? issue.milestone_due.substring(0, 10) : null;\n\n  const properties = {\n    Name: { title: [{ text: { content: taskName } }] },\n    Status: { status: { name: taskStatus } },\n    ' Type': { select: { name: taskType } },\n    Project: { relation: [{ id: projectId }] }\n  };\n\n  if (dueDate) {\n    properties.Due = { date: { start: dueDate } };\n  }\n\n  if (courseRelation.length > 0) {\n    properties.Course = { relation: courseRelation };\n  }\n\n  tasksToCreate.push({\n    parent: { database_id: '303ea6baeea781eb874ad3a7a4af55df' },\n    properties\n  });\n}\n\n// Check for tasks that should be closed (exist in Notion but issue is no longer open)\nconst openIssueNumbers = new Set((repo.issuesToSync || []).map(i => String(i.number)));\nconst tasksToClose = [];\nfor (const [num, task] of Object.entries(existingTaskMap)) {\n  if (!openIssueNumbers.has(num) && task.status !== 'Done') {\n    tasksToClose.push({ id: task.id, title: task.title });\n  }\n  // Collect all existing task IDs for relation update\n  if (!existingTaskIds.includes(task.id)) {\n    existingTaskIds.push(task.id);\n  }\n}\n\nreturn [{\n  json: {\n    ...repo,\n    tasksToCreate,\n    tasksToClose,\n    existingTaskNotionIds: existingTaskIds\n  }\n}];"
+      },
+      "id": "diff-tasks",
+      "name": "Diff Tasks",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [3650, 600]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Create new tasks one by one and collect their IDs\nconst data = $json;\nconst tasksToCreate = data.tasksToCreate || [];\nconst tasksToClose = data.tasksToClose || [];\nconst createdTaskIds = [];\nconst errors = [];\n\n// We'll use $helpers to make HTTP requests for creating tasks\nfor (let i = 0; i < tasksToCreate.length; i++) {\n  try {\n    const response = await this.helpers.httpRequest({\n      method: 'POST',\n      url: 'https://api.notion.com/v1/pages',\n      headers: {\n        'Authorization': `Bearer ${$credentials.httpHeaderAuth.value}`,\n        'Notion-Version': '2022-06-28',\n        'Content-Type': 'application/json'\n      },\n      body: tasksToCreate[i],\n      json: true\n    });\n    createdTaskIds.push(response.id);\n    // Rate limit: wait 350ms between requests\n    await new Promise(resolve => setTimeout(resolve, 350));\n  } catch (err) {\n    errors.push(`Task creation failed: ${err.message}`);\n  }\n}\n\n// Close tasks that are no longer open\nfor (const task of tasksToClose) {\n  try {\n    await this.helpers.httpRequest({\n      method: 'PATCH',\n      url: `https://api.notion.com/v1/pages/${task.id}`,\n      headers: {\n        'Authorization': `Bearer ${$credentials.httpHeaderAuth.value}`,\n        'Notion-Version': '2022-06-28',\n        'Content-Type': 'application/json'\n      },\n      body: { properties: { Status: { status: { name: 'Done' } } } },\n      json: true\n    });\n    await new Promise(resolve => setTimeout(resolve, 350));\n  } catch (err) {\n    errors.push(`Task close failed for ${task.title}: ${err.message}`);\n  }\n}\n\n// Combine all task IDs for this project's relation\nconst allTaskIds = [...(data.existingTaskNotionIds || []), ...createdTaskIds];\n\nreturn [{\n  json: {\n    ...data,\n    createdTaskIds,\n    allTaskNotionIds: allTaskIds,\n    taskErrors: errors,\n    newTaskCount: createdTaskIds.length,\n    closedTaskCount: tasksToClose.length\n  }\n}];"
+      },
+      "id": "create-close-tasks",
+      "name": "Create & Close Tasks",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [3900, 600],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "2",
+          "name": "notion_integration"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "// Prepare resources for this repo\nconst repo = $json;\nconst projectId = repo.projectNotionId;\nconst courseRelation = repo.courseRelationForChildren || [];\n\nif (!projectId) {\n  return [{ json: { ...repo, resourcesToCreate: [], resourceSyncSkipped: true } }];\n}\n\n// Build resource candidates\nconst resources = [];\n\n// 1. GitHub repo itself\nresources.push({\n  name: `${repo.name} — Repository`,\n  url: repo.html_url,\n  types: ['Github'],\n  projectId,\n  courseRelation\n});\n\n// 2. Documentation\nif (repo.hasDocsDir || (repo.health && repo.health.hasDocs)) {\n  resources.push({\n    name: `${repo.name} — Docs`,\n    url: repo.externalLinks?.docsUrl || `https://github.com/${repo.full_name}/tree/${repo.default_branch}/docs`,\n    types: ['Github', 'Docs'],\n    projectId,\n    courseRelation\n  });\n}\nif (repo.health?.hasWiki && repo.has_wiki) {\n  resources.push({\n    name: `${repo.name} — Wiki`,\n    url: repo.externalLinks?.wikiUrl || `https://github.com/${repo.full_name}/wiki`,\n    types: ['Github', 'Docs'],\n    projectId,\n    courseRelation\n  });\n}\n\n// 3. Homepage\nif (repo.homepage) {\n  resources.push({\n    name: `${repo.name} — Homepage`,\n    url: repo.homepage,\n    types: ['Website'],\n    projectId,\n    courseRelation\n  });\n}\n\n// 4. Package registry\nif (repo.projectType === 'node' && repo.foundConfigFiles?.includes('package.json')) {\n  resources.push({\n    name: `${repo.name} — Package`,\n    url: `https://www.npmjs.com/package/${repo.name}`,\n    types: ['Library'],\n    projectId,\n    courseRelation\n  });\n} else if (repo.projectType === 'python' && (repo.foundConfigFiles?.includes('pyproject.toml') || repo.foundConfigFiles?.includes('requirements.txt'))) {\n  resources.push({\n    name: `${repo.name} — Package`,\n    url: `https://pypi.org/project/${repo.name}/`,\n    types: ['Library'],\n    projectId,\n    courseRelation\n  });\n}\n\nreturn [{ json: { ...repo, resourceCandidates: resources } }];"
+      },
+      "id": "prepare-resources",
+      "name": "Prepare Resources",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [4150, 600]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Query existing resources and create new ones, avoiding duplicates\nconst data = $json;\nconst candidates = data.resourceCandidates || [];\nconst projectId = data.projectNotionId;\nconst createdResourceIds = [];\nconst existingResourceIds = [];\nconst errors = [];\n\nfor (const resource of candidates) {\n  try {\n    // Check for existing resource by URL\n    const queryResponse = await this.helpers.httpRequest({\n      method: 'POST',\n      url: 'https://api.notion.com/v1/databases/303ea6baeea7812c8b1dffa330ed7a4d/query',\n      headers: {\n        'Authorization': `Bearer ${$credentials.httpHeaderAuth.value}`,\n        'Notion-Version': '2022-06-28',\n        'Content-Type': 'application/json'\n      },\n      body: {\n        filter: {\n          property: 'URL',\n          url: { equals: resource.url }\n        }\n      },\n      json: true\n    });\n    await new Promise(resolve => setTimeout(resolve, 350));\n\n    const existing = queryResponse.results || [];\n    if (existing.length > 0) {\n      existingResourceIds.push(existing[0].id);\n      continue;\n    }\n\n    // Create new resource\n    const properties = {\n      Name: { title: [{ text: { content: resource.name } }] },\n      URL: { url: resource.url },\n      Type: { multi_select: resource.types.map(t => ({ name: t })) },\n      Status: { status: { name: 'Sort' } },\n      Project: { relation: [{ id: resource.projectId }] }\n    };\n\n    if (resource.courseRelation && resource.courseRelation.length > 0) {\n      properties.Course = { relation: resource.courseRelation };\n    }\n\n    const createResponse = await this.helpers.httpRequest({\n      method: 'POST',\n      url: 'https://api.notion.com/v1/pages',\n      headers: {\n        'Authorization': `Bearer ${$credentials.httpHeaderAuth.value}`,\n        'Notion-Version': '2022-06-28',\n        'Content-Type': 'application/json'\n      },\n      body: {\n        parent: { database_id: '303ea6baeea7812c8b1dffa330ed7a4d' },\n        properties\n      },\n      json: true\n    });\n    createdResourceIds.push(createResponse.id);\n    await new Promise(resolve => setTimeout(resolve, 350));\n  } catch (err) {\n    errors.push(`Resource sync failed for ${resource.name}: ${err.message}`);\n  }\n}\n\nconst allResourceIds = [...existingResourceIds, ...createdResourceIds];\n\nreturn [{\n  json: {\n    ...data,\n    createdResourceIds,\n    allResourceNotionIds: allResourceIds,\n    resourceErrors: errors,\n    newResourceCount: createdResourceIds.length\n  }\n}];"
+      },
+      "id": "sync-resources",
+      "name": "Sync Resources",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [4400, 600],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "2",
+          "name": "notion_integration"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "// Prepare and sync snippets for this repo\nconst data = $json;\nconst projectId = data.projectNotionId;\nconst courseRelation = data.courseRelationForChildren || [];\nconst snippetCandidates = data.snippetCandidates || [];\n\nif (!projectId || snippetCandidates.length === 0) {\n  return [{\n    json: {\n      ...data,\n      createdSnippetIds: [],\n      allSnippetNotionIds: [],\n      snippetErrors: [],\n      newSnippetCount: 0\n    }\n  }];\n}\n\nconst createdSnippetIds = [];\nconst existingSnippetIds = [];\nconst errors = [];\n\nfor (const candidate of snippetCandidates) {\n  try {\n    let snippetUrl;\n    let snippetName;\n\n    if (candidate.type === 'file') {\n      snippetUrl = candidate.url;\n      snippetName = `${data.name} — ${candidate.name}`;\n    } else if (candidate.type === 'directory') {\n      snippetUrl = `https://github.com/${data.full_name}/tree/${data.default_branch}/${candidate.path}`;\n      snippetName = `${data.name} — ${candidate.name}`;\n    } else {\n      continue;\n    }\n\n    // Check for existing snippet by URL\n    const queryResponse = await this.helpers.httpRequest({\n      method: 'POST',\n      url: 'https://api.notion.com/v1/databases/303ea6baeea781db9cfac8c859263ca9/query',\n      headers: {\n        'Authorization': `Bearer ${$credentials.httpHeaderAuth.value}`,\n        'Notion-Version': '2022-06-28',\n        'Content-Type': 'application/json'\n      },\n      body: {\n        filter: {\n          property: 'URL',\n          url: { equals: snippetUrl }\n        }\n      },\n      json: true\n    });\n    await new Promise(resolve => setTimeout(resolve, 350));\n\n    const existing = queryResponse.results || [];\n    if (existing.length > 0) {\n      existingSnippetIds.push(existing[0].id);\n      continue;\n    }\n\n    // Create new snippet\n    const properties = {\n      Name: { title: [{ text: { content: snippetName } }] },\n      URL: { url: snippetUrl },\n      Projects: { relation: [{ id: projectId }] }\n    };\n\n    if (courseRelation && courseRelation.length > 0) {\n      properties.Course = { relation: courseRelation };\n    }\n\n    const createResponse = await this.helpers.httpRequest({\n      method: 'POST',\n      url: 'https://api.notion.com/v1/pages',\n      headers: {\n        'Authorization': `Bearer ${$credentials.httpHeaderAuth.value}`,\n        'Notion-Version': '2022-06-28',\n        'Content-Type': 'application/json'\n      },\n      body: {\n        parent: { database_id: '303ea6baeea781db9cfac8c859263ca9' },\n        properties\n      },\n      json: true\n    });\n    createdSnippetIds.push(createResponse.id);\n    await new Promise(resolve => setTimeout(resolve, 350));\n  } catch (err) {\n    errors.push(`Snippet sync failed for ${candidate.name}: ${err.message}`);\n  }\n}\n\nconst allSnippetIds = [...existingSnippetIds, ...createdSnippetIds];\n\nreturn [{\n  json: {\n    ...data,\n    createdSnippetIds,\n    allSnippetNotionIds: allSnippetIds,\n    snippetErrors: errors,\n    newSnippetCount: createdSnippetIds.length\n  }\n}];"
+      },
+      "id": "sync-snippets",
+      "name": "Sync Snippets",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [4650, 600],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "2",
+          "name": "notion_integration"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "// Update the Project's reverse relations: Tasks, Resources, Snippets\nconst data = $json;\nconst projectId = data.projectNotionId;\n\nif (!projectId) {\n  return [{ json: { ...data, relationUpdateSkipped: true } }];\n}\n\nconst errors = [];\n\n// Build relation arrays — merge existing with new, deduplicate\nconst existingTaskRels = (data.existingTaskRelations || []).map(r => r.id);\nconst allTaskIds = [...new Set([...existingTaskRels, ...(data.allTaskNotionIds || [])])];\n\nconst existingResourceRels = (data.existingResourceRelations || []).map(r => r.id);\nconst allResourceIds = [...new Set([...existingResourceRels, ...(data.allResourceNotionIds || [])])];\n\nconst existingSnippetRels = (data.existingSnippetRelations || []).map(r => r.id);\nconst allSnippetIds = [...new Set([...existingSnippetRels, ...(data.allSnippetNotionIds || [])])];\n\nconst properties = {};\n\nif (allTaskIds.length > 0) {\n  properties.Tasks = { relation: allTaskIds.map(id => ({ id })) };\n}\nif (allResourceIds.length > 0) {\n  properties.Resources = { relation: allResourceIds.map(id => ({ id })) };\n}\nif (allSnippetIds.length > 0) {\n  properties.Snippets = { relation: allSnippetIds.map(id => ({ id })) };\n}\n\nif (Object.keys(properties).length > 0) {\n  try {\n    await this.helpers.httpRequest({\n      method: 'PATCH',\n      url: `https://api.notion.com/v1/pages/${projectId}`,\n      headers: {\n        'Authorization': `Bearer ${$credentials.httpHeaderAuth.value}`,\n        'Notion-Version': '2022-06-28',\n        'Content-Type': 'application/json'\n      },\n      body: { properties },\n      json: true\n    });\n  } catch (err) {\n    errors.push(`Project relation update failed: ${err.message}`);\n  }\n}\n\nreturn [{\n  json: {\n    ...data,\n    relationUpdateErrors: errors,\n    relationsWired: {\n      tasks: allTaskIds.length,\n      resources: allResourceIds.length,\n      snippets: allSnippetIds.length\n    }\n  }\n}];"
+      },
+      "id": "update-project-relations",
+      "name": "Update Project Relations",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [4900, 600],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "2",
+          "name": "notion_integration"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "// Collect per-repo results and loop back to batch\nconst data = $json;\n\n// Store this repo's summary in the workflow's static data for final aggregation\nconst staticData = $getWorkflowStaticData('global');\nif (!staticData.repoResults) {\n  staticData.repoResults = [];\n}\n\nstaticData.repoResults.push({\n  name: data.name,\n  full_name: data.full_name,\n  isNewProject: data.isNewProject,\n  recentCommitCount: data.recentCommitCount,\n  newTaskCount: data.newTaskCount || 0,\n  closedTaskCount: data.closedTaskCount || 0,\n  newResourceCount: data.newResourceCount || 0,\n  newSnippetCount: data.newSnippetCount || 0,\n  relationsWired: data.relationsWired || {},\n  errors: [\n    ...(data.taskErrors || []),\n    ...(data.resourceErrors || []),\n    ...(data.snippetErrors || []),\n    ...(data.relationUpdateErrors || [])\n  ]\n});\n\nreturn [{ json: data }];"
+      },
+      "id": "collect-results",
+      "name": "Collect Results",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [5150, 600]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Relation Integrity Verification Pass\n// Query all Tasks, Resources, Snippets with empty Project relations\nconst errors = [];\nconst repairs = [];\n\ntry {\n  // 1. Find orphan Tasks (no Project relation)\n  const orphanTasksResponse = await this.helpers.httpRequest({\n    method: 'POST',\n    url: 'https://api.notion.com/v1/databases/303ea6baeea781eb874ad3a7a4af55df/query',\n    headers: {\n      'Authorization': `Bearer ${$credentials.httpHeaderAuth.value}`,\n      'Notion-Version': '2022-06-28',\n      'Content-Type': 'application/json'\n    },\n    body: {\n      filter: {\n        property: 'Project',\n        relation: { is_empty: true }\n      }\n    },\n    json: true\n  });\n  const orphanTasks = orphanTasksResponse.results || [];\n  await new Promise(resolve => setTimeout(resolve, 350));\n\n  // 2. Find orphan Resources (no Project relation)\n  const orphanResourcesResponse = await this.helpers.httpRequest({\n    method: 'POST',\n    url: 'https://api.notion.com/v1/databases/303ea6baeea7812c8b1dffa330ed7a4d/query',\n    headers: {\n      'Authorization': `Bearer ${$credentials.httpHeaderAuth.value}`,\n      'Notion-Version': '2022-06-28',\n      'Content-Type': 'application/json'\n    },\n    body: {\n      filter: {\n        property: 'Project',\n        relation: { is_empty: true }\n      }\n    },\n    json: true\n  });\n  const orphanResources = orphanResourcesResponse.results || [];\n  await new Promise(resolve => setTimeout(resolve, 350));\n\n  // 3. Find orphan Snippets (no Projects relation)\n  const orphanSnippetsResponse = await this.helpers.httpRequest({\n    method: 'POST',\n    url: 'https://api.notion.com/v1/databases/303ea6baeea781db9cfac8c859263ca9/query',\n    headers: {\n      'Authorization': `Bearer ${$credentials.httpHeaderAuth.value}`,\n      'Notion-Version': '2022-06-28',\n      'Content-Type': 'application/json'\n    },\n    body: {\n      filter: {\n        property: 'Projects',\n        relation: { is_empty: true }\n      }\n    },\n    json: true\n  });\n  const orphanSnippets = orphanSnippetsResponse.results || [];\n  await new Promise(resolve => setTimeout(resolve, 350));\n\n  // 4-6. For each Project, verify its reverse relations contain all referencing entities\n  // Query all projects\n  const allProjectsResponse = await this.helpers.httpRequest({\n    method: 'POST',\n    url: 'https://api.notion.com/v1/databases/303ea6baeea781ed9aeeeb42901b05c2/query',\n    headers: {\n      'Authorization': `Bearer ${$credentials.httpHeaderAuth.value}`,\n      'Notion-Version': '2022-06-28',\n      'Content-Type': 'application/json'\n    },\n    body: {},\n    json: true\n  });\n  const allProjects = allProjectsResponse.results || [];\n  await new Promise(resolve => setTimeout(resolve, 350));\n\n  // For each project, check if tasks that reference it are in its Tasks relation\n  for (const project of allProjects) {\n    const projectId = project.id;\n    const projectName = project.properties?.Name?.title?.[0]?.plain_text || 'Unknown';\n    const projectTaskRelIds = (project.properties?.Tasks?.relation || []).map(r => r.id);\n    const projectResourceRelIds = (project.properties?.Resources?.relation || []).map(r => r.id);\n    const projectSnippetRelIds = (project.properties?.Snippets?.relation || []).map(r => r.id);\n\n    // Query tasks that reference this project\n    try {\n      const tasksForProject = await this.helpers.httpRequest({\n        method: 'POST',\n        url: 'https://api.notion.com/v1/databases/303ea6baeea781eb874ad3a7a4af55df/query',\n        headers: {\n          'Authorization': `Bearer ${$credentials.httpHeaderAuth.value}`,\n          'Notion-Version': '2022-06-28',\n          'Content-Type': 'application/json'\n        },\n        body: {\n          filter: {\n            property: 'Project',\n            relation: { contains: projectId }\n          }\n        },\n        json: true\n      });\n      await new Promise(resolve => setTimeout(resolve, 350));\n\n      const taskIds = (tasksForProject.results || []).map(t => t.id);\n      const missingTaskIds = taskIds.filter(id => !projectTaskRelIds.includes(id));\n\n      if (missingTaskIds.length > 0) {\n        // Repair: update project's Tasks relation\n        const mergedTaskIds = [...new Set([...projectTaskRelIds, ...missingTaskIds])];\n        await this.helpers.httpRequest({\n          method: 'PATCH',\n          url: `https://api.notion.com/v1/pages/${projectId}`,\n          headers: {\n            'Authorization': `Bearer ${$credentials.httpHeaderAuth.value}`,\n            'Notion-Version': '2022-06-28',\n            'Content-Type': 'application/json'\n          },\n          body: {\n            properties: {\n              Tasks: { relation: mergedTaskIds.map(id => ({ id })) }\n            }\n          },\n          json: true\n        });\n        repairs.push(`Project \"${projectName}\": added ${missingTaskIds.length} missing task relation(s)`);\n        await new Promise(resolve => setTimeout(resolve, 350));\n      }\n\n      // Check resources\n      const resourcesForProject = await this.helpers.httpRequest({\n        method: 'POST',\n        url: 'https://api.notion.com/v1/databases/303ea6baeea7812c8b1dffa330ed7a4d/query',\n        headers: {\n          'Authorization': `Bearer ${$credentials.httpHeaderAuth.value}`,\n          'Notion-Version': '2022-06-28',\n          'Content-Type': 'application/json'\n        },\n        body: {\n          filter: {\n            property: 'Project',\n            relation: { contains: projectId }\n          }\n        },\n        json: true\n      });\n      await new Promise(resolve => setTimeout(resolve, 350));\n\n      const resourceIds = (resourcesForProject.results || []).map(r => r.id);\n      const missingResourceIds = resourceIds.filter(id => !projectResourceRelIds.includes(id));\n\n      if (missingResourceIds.length > 0) {\n        const mergedResourceIds = [...new Set([...projectResourceRelIds, ...missingResourceIds])];\n        await this.helpers.httpRequest({\n          method: 'PATCH',\n          url: `https://api.notion.com/v1/pages/${projectId}`,\n          headers: {\n            'Authorization': `Bearer ${$credentials.httpHeaderAuth.value}`,\n            'Notion-Version': '2022-06-28',\n            'Content-Type': 'application/json'\n          },\n          body: {\n            properties: {\n              Resources: { relation: mergedResourceIds.map(id => ({ id })) }\n            }\n          },\n          json: true\n        });\n        repairs.push(`Project \"${projectName}\": added ${missingResourceIds.length} missing resource relation(s)`);\n        await new Promise(resolve => setTimeout(resolve, 350));\n      }\n\n      // Check snippets\n      const snippetsForProject = await this.helpers.httpRequest({\n        method: 'POST',\n        url: 'https://api.notion.com/v1/databases/303ea6baeea781db9cfac8c859263ca9/query',\n        headers: {\n          'Authorization': `Bearer ${$credentials.httpHeaderAuth.value}`,\n          'Notion-Version': '2022-06-28',\n          'Content-Type': 'application/json'\n        },\n        body: {\n          filter: {\n            property: 'Projects',\n            relation: { contains: projectId }\n          }\n        },\n        json: true\n      });\n      await new Promise(resolve => setTimeout(resolve, 350));\n\n      const snippetIds = (snippetsForProject.results || []).map(s => s.id);\n      const missingSnippetIds = snippetIds.filter(id => !projectSnippetRelIds.includes(id));\n\n      if (missingSnippetIds.length > 0) {\n        const mergedSnippetIds = [...new Set([...projectSnippetRelIds, ...missingSnippetIds])];\n        await this.helpers.httpRequest({\n          method: 'PATCH',\n          url: `https://api.notion.com/v1/pages/${projectId}`,\n          headers: {\n            'Authorization': `Bearer ${$credentials.httpHeaderAuth.value}`,\n            'Notion-Version': '2022-06-28',\n            'Content-Type': 'application/json'\n          },\n          body: {\n            properties: {\n              Snippets: { relation: mergedSnippetIds.map(id => ({ id })) }\n            }\n          },\n          json: true\n        });\n        repairs.push(`Project \"${projectName}\": added ${missingSnippetIds.length} missing snippet relation(s)`);\n        await new Promise(resolve => setTimeout(resolve, 350));\n      }\n    } catch (err) {\n      errors.push(`Integrity check failed for project \"${projectName}\": ${err.message}`);\n    }\n  }\n\n  return [{\n    json: {\n      integrityReport: {\n        orphanTasks: orphanTasks.map(t => ({\n          id: t.id,\n          name: t.properties?.Name?.title?.[0]?.plain_text || 'Unknown'\n        })),\n        orphanResources: orphanResources.map(r => ({\n          id: r.id,\n          name: r.properties?.Name?.title?.[0]?.plain_text || 'Unknown'\n        })),\n        orphanSnippets: orphanSnippets.map(s => ({\n          id: s.id,\n          name: s.properties?.Name?.title?.[0]?.plain_text || 'Unknown'\n        })),\n        orphanTaskCount: orphanTasks.length,\n        orphanResourceCount: orphanResources.length,\n        orphanSnippetCount: orphanSnippets.length,\n        repairs,\n        repairCount: repairs.length,\n        errors\n      }\n    }\n  }];\n} catch (err) {\n  return [{\n    json: {\n      integrityReport: {\n        error: `Integrity verification failed: ${err.message}`,\n        orphanTaskCount: -1,\n        orphanResourceCount: -1,\n        orphanSnippetCount: -1,\n        repairs: [],\n        repairCount: 0,\n        errors: [err.message]\n      }\n    }\n  }];\n}"
+      },
+      "id": "integrity-verification",
+      "name": "Integrity Verification",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [5600, 300],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "2",
+          "name": "notion_integration"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "// Compile final summary report\nconst staticData = $getWorkflowStaticData('global');\nconst repoResults = staticData.repoResults || [];\nconst integrityReport = $items('Integrity Verification')[0]?.json?.integrityReport || {};\n\nconst totalRepos = repoResults.length;\nconst newProjects = repoResults.filter(r => r.isNewProject).length;\nconst updatedProjects = totalRepos - newProjects;\nconst totalNewTasks = repoResults.reduce((sum, r) => sum + (r.newTaskCount || 0), 0);\nconst totalClosedTasks = repoResults.reduce((sum, r) => sum + (r.closedTaskCount || 0), 0);\nconst totalNewResources = repoResults.reduce((sum, r) => sum + (r.newResourceCount || 0), 0);\nconst totalNewSnippets = repoResults.reduce((sum, r) => sum + (r.newSnippetCount || 0), 0);\n\nconst totalRelationsWired = repoResults.reduce((sum, r) => {\n  const rel = r.relationsWired || {};\n  return sum + (rel.tasks || 0) + (rel.resources || 0) + (rel.snippets || 0);\n}, 0);\n\nconst allErrors = repoResults.flatMap(r => r.errors || []);\n\n// Sort by commit count for activity ranking\nconst byActivity = [...repoResults]\n  .sort((a, b) => (b.recentCommitCount || 0) - (a.recentCommitCount || 0))\n  .slice(0, 5)\n  .map(r => ({ name: r.full_name, commits_last_7_days: r.recentCommitCount || 0 }));\n\nconst summary = {\n  timestamp: new Date().toISOString(),\n  totalReposAnalyzed: totalRepos,\n  projects: {\n    newAdded: newProjects,\n    updated: updatedProjects\n  },\n  tasks: {\n    newCreated: totalNewTasks,\n    markedDone: totalClosedTasks\n  },\n  resources: {\n    newCreated: totalNewResources\n  },\n  snippets: {\n    newCreated: totalNewSnippets\n  },\n  relations: {\n    totalWired: totalRelationsWired,\n    orphansFound: {\n      tasks: integrityReport.orphanTaskCount || 0,\n      resources: integrityReport.orphanResourceCount || 0,\n      snippets: integrityReport.orphanSnippetCount || 0\n    },\n    repairsPerformed: integrityReport.repairCount || 0,\n    repairDetails: integrityReport.repairs || []\n  },\n  highestActivity: byActivity,\n  errors: allErrors,\n  integrityErrors: integrityReport.errors || []\n};\n\n// Clear static data for next run\nstaticData.repoResults = [];\n\nreturn [{ json: summary }];"
+      },
+      "id": "summary-report",
+      "name": "Summary Report",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [5900, 300]
+    }
+  ],
+  "connections": {
+    "Start": {
+      "main": [
+        [
+          { "node": "Fetch User Repos", "type": "main", "index": 0 },
+          { "node": "Fetch Org Repos", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Fetch User Repos": {
+      "main": [
+        [
+          { "node": "Merge & Filter Repos", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Fetch Org Repos": {
+      "main": [
+        [
+          { "node": "Merge & Filter Repos", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Merge & Filter Repos": {
+      "main": [
+        [
+          { "node": "Batch Repos", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Batch Repos": {
+      "main": [
+        [
+          { "node": "Rate Limit Wait", "type": "main", "index": 0 }
+        ],
+        [
+          { "node": "Integrity Verification", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Rate Limit Wait": {
+      "main": [
+        [
+          { "node": "Fetch Recent Commits", "type": "main", "index": 0 },
+          { "node": "Fetch Open Issues", "type": "main", "index": 0 },
+          { "node": "Fetch Open PRs", "type": "main", "index": 0 },
+          { "node": "Fetch Languages", "type": "main", "index": 0 },
+          { "node": "Fetch Branches", "type": "main", "index": 0 },
+          { "node": "Fetch Latest Release", "type": "main", "index": 0 },
+          { "node": "Fetch Root Contents", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Fetch Recent Commits": {
+      "main": [
+        [
+          { "node": "Aggregate Repo Data", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Fetch Open Issues": {
+      "main": [
+        [
+          { "node": "Aggregate Repo Data", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Fetch Open PRs": {
+      "main": [
+        [
+          { "node": "Aggregate Repo Data", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Fetch Languages": {
+      "main": [
+        [
+          { "node": "Aggregate Repo Data", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Fetch Branches": {
+      "main": [
+        [
+          { "node": "Aggregate Repo Data", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Fetch Latest Release": {
+      "main": [
+        [
+          { "node": "Aggregate Repo Data", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Fetch Root Contents": {
+      "main": [
+        [
+          { "node": "Aggregate Repo Data", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Aggregate Repo Data": {
+      "main": [
+        [
+          { "node": "Query Existing Project", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Query Existing Project": {
+      "main": [
+        [
+          { "node": "Decide Project Action", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Decide Project Action": {
+      "main": [
+        [
+          { "node": "IF New Project", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "IF New Project": {
+      "main": [
+        [
+          { "node": "Create Project", "type": "main", "index": 0 }
+        ],
+        [
+          { "node": "Update Project", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Create Project": {
+      "main": [
+        [
+          { "node": "Consolidate Project", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Update Project": {
+      "main": [
+        [
+          { "node": "Consolidate Project", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Consolidate Project": {
+      "main": [
+        [
+          { "node": "Prepare Tasks", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Prepare Tasks": {
+      "main": [
+        [
+          { "node": "Query Existing Tasks", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Query Existing Tasks": {
+      "main": [
+        [
+          { "node": "Diff Tasks", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Diff Tasks": {
+      "main": [
+        [
+          { "node": "Create & Close Tasks", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Create & Close Tasks": {
+      "main": [
+        [
+          { "node": "Prepare Resources", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Prepare Resources": {
+      "main": [
+        [
+          { "node": "Sync Resources", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Sync Resources": {
+      "main": [
+        [
+          { "node": "Sync Snippets", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Sync Snippets": {
+      "main": [
+        [
+          { "node": "Update Project Relations", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Update Project Relations": {
+      "main": [
+        [
+          { "node": "Collect Results", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Collect Results": {
+      "main": [
+        [
+          { "node": "Batch Repos", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Integrity Verification": {
+      "main": [
+        [
+          { "node": "Summary Report", "type": "main", "index": 0 }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": ""
+  },
+  "staticData": null,
+  "tags": [],
+  "pinData": {},
+  "versionId": "1"
+}
