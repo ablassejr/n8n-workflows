@@ -7,7 +7,10 @@
       "name": "Start",
       "type": "n8n-nodes-base.manualTrigger",
       "typeVersion": 1,
-      "position": [0, 300]
+      "position": [
+        0,
+        300
+      ]
     },
     {
       "parameters": {
@@ -17,19 +20,32 @@
         "sendQuery": true,
         "queryParameters": {
           "parameters": [
-            { "name": "per_page", "value": "100" },
-            { "name": "type", "value": "all" }
+            {
+              "name": "per_page",
+              "value": "100"
+            },
+            {
+              "name": "type",
+              "value": "all"
+            }
           ]
         },
         "options": {
-          "response": { "response": { "fullResponse": false } }
+          "response": {
+            "response": {
+              "fullResponse": false
+            }
+          }
         }
       },
       "id": "fetch-user-repos",
       "name": "Fetch User Repos",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [250, 200],
+      "position": [
+        250,
+        200
+      ],
       "credentials": {
         "httpHeaderAuth": {
           "id": "1",
@@ -46,19 +62,32 @@
         "sendQuery": true,
         "queryParameters": {
           "parameters": [
-            { "name": "per_page", "value": "100" },
-            { "name": "type", "value": "all" }
+            {
+              "name": "per_page",
+              "value": "100"
+            },
+            {
+              "name": "type",
+              "value": "all"
+            }
           ]
         },
         "options": {
-          "response": { "response": { "fullResponse": false } }
+          "response": {
+            "response": {
+              "fullResponse": false
+            }
+          }
         }
       },
       "id": "fetch-org-repos",
       "name": "Fetch Org Repos",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [250, 450],
+      "position": [
+        250,
+        450
+      ],
       "credentials": {
         "httpHeaderAuth": {
           "id": "1",
@@ -75,7 +104,10 @@
       "name": "Merge & Filter Repos",
       "type": "n8n-nodes-base.function",
       "typeVersion": 1,
-      "position": [500, 300]
+      "position": [
+        500,
+        300
+      ]
     },
     {
       "parameters": {
@@ -88,7 +120,10 @@
       "name": "Batch Repos",
       "type": "n8n-nodes-base.splitInBatches",
       "typeVersion": 3,
-      "position": [750, 300]
+      "position": [
+        750,
+        300
+      ]
     },
     {
       "parameters": {
@@ -98,7 +133,10 @@
       "name": "Rate Limit Wait",
       "type": "n8n-nodes-base.function",
       "typeVersion": 1,
-      "position": [1000, 300]
+      "position": [
+        1000,
+        300
+      ]
     },
     {
       "parameters": {
@@ -108,19 +146,32 @@
         "sendQuery": true,
         "queryParameters": {
           "parameters": [
-            { "name": "per_page", "value": "30" },
-            { "name": "since", "value": "={{ new Date(Date.now() - 7*24*60*60*1000).toISOString() }}" }
+            {
+              "name": "per_page",
+              "value": "30"
+            },
+            {
+              "name": "since",
+              "value": "={{ new Date(Date.now() - 7*24*60*60*1000).toISOString() }}"
+            }
           ]
         },
         "options": {
-          "response": { "response": { "fullResponse": false } }
+          "response": {
+            "response": {
+              "fullResponse": false
+            }
+          }
         }
       },
       "id": "fetch-recent-commits",
       "name": "Fetch Recent Commits",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1250, 100],
+      "position": [
+        1250,
+        100
+      ],
       "credentials": {
         "httpHeaderAuth": {
           "id": "1",
@@ -137,19 +188,32 @@
         "sendQuery": true,
         "queryParameters": {
           "parameters": [
-            { "name": "state", "value": "open" },
-            { "name": "per_page", "value": "100" }
+            {
+              "name": "state",
+              "value": "open"
+            },
+            {
+              "name": "per_page",
+              "value": "100"
+            }
           ]
         },
         "options": {
-          "response": { "response": { "fullResponse": false } }
+          "response": {
+            "response": {
+              "fullResponse": false
+            }
+          }
         }
       },
       "id": "fetch-open-issues",
       "name": "Fetch Open Issues",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1250, 300],
+      "position": [
+        1250,
+        300
+      ],
       "credentials": {
         "httpHeaderAuth": {
           "id": "1",
@@ -166,19 +230,32 @@
         "sendQuery": true,
         "queryParameters": {
           "parameters": [
-            { "name": "state", "value": "open" },
-            { "name": "per_page", "value": "100" }
+            {
+              "name": "state",
+              "value": "open"
+            },
+            {
+              "name": "per_page",
+              "value": "100"
+            }
           ]
         },
         "options": {
-          "response": { "response": { "fullResponse": false } }
+          "response": {
+            "response": {
+              "fullResponse": false
+            }
+          }
         }
       },
       "id": "fetch-open-prs",
       "name": "Fetch Open PRs",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1250, 500],
+      "position": [
+        1250,
+        500
+      ],
       "credentials": {
         "httpHeaderAuth": {
           "id": "1",
@@ -193,14 +270,21 @@
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "options": {
-          "response": { "response": { "fullResponse": false } }
+          "response": {
+            "response": {
+              "fullResponse": false
+            }
+          }
         }
       },
       "id": "fetch-languages",
       "name": "Fetch Languages",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1250, 700],
+      "position": [
+        1250,
+        700
+      ],
       "credentials": {
         "httpHeaderAuth": {
           "id": "1",
@@ -217,18 +301,28 @@
         "sendQuery": true,
         "queryParameters": {
           "parameters": [
-            { "name": "per_page", "value": "100" }
+            {
+              "name": "per_page",
+              "value": "100"
+            }
           ]
         },
         "options": {
-          "response": { "response": { "fullResponse": false } }
+          "response": {
+            "response": {
+              "fullResponse": false
+            }
+          }
         }
       },
       "id": "fetch-branches",
       "name": "Fetch Branches",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1250, 900],
+      "position": [
+        1250,
+        900
+      ],
       "credentials": {
         "httpHeaderAuth": {
           "id": "1",
@@ -243,14 +337,21 @@
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "options": {
-          "response": { "response": { "fullResponse": false } }
+          "response": {
+            "response": {
+              "fullResponse": false
+            }
+          }
         }
       },
       "id": "fetch-latest-release",
       "name": "Fetch Latest Release",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1250, 1100],
+      "position": [
+        1250,
+        1100
+      ],
       "credentials": {
         "httpHeaderAuth": {
           "id": "1",
@@ -265,14 +366,21 @@
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "options": {
-          "response": { "response": { "fullResponse": false } }
+          "response": {
+            "response": {
+              "fullResponse": false
+            }
+          }
         }
       },
       "id": "fetch-root-contents",
       "name": "Fetch Root Contents",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1250, 1300],
+      "position": [
+        1250,
+        1300
+      ],
       "credentials": {
         "httpHeaderAuth": {
           "id": "1",
@@ -289,7 +397,10 @@
       "name": "Aggregate Repo Data",
       "type": "n8n-nodes-base.function",
       "typeVersion": 1,
-      "position": [1550, 600]
+      "position": [
+        1550,
+        600
+      ]
     },
     {
       "parameters": {
@@ -309,8 +420,14 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Notion-Version", "value": "2022-06-28" },
-            { "name": "Content-Type", "value": "application/json" }
+            {
+              "name": "Notion-Version",
+              "value": "2022-06-28"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
           ]
         },
         "options": {}
@@ -319,7 +436,10 @@
       "name": "Query Existing Project",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1850, 600],
+      "position": [
+        1850,
+        600
+      ],
       "credentials": {
         "httpHeaderAuth": {
           "id": "2",
@@ -336,7 +456,10 @@
       "name": "Decide Project Action",
       "type": "n8n-nodes-base.function",
       "typeVersion": 1,
-      "position": [2100, 600]
+      "position": [
+        2100,
+        600
+      ]
     },
     {
       "parameters": {
@@ -353,7 +476,10 @@
       "name": "IF New Project",
       "type": "n8n-nodes-base.if",
       "typeVersion": 1,
-      "position": [2350, 600]
+      "position": [
+        2350,
+        600
+      ]
     },
     {
       "parameters": {
@@ -367,8 +493,14 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Notion-Version", "value": "2022-06-28" },
-            { "name": "Content-Type", "value": "application/json" }
+            {
+              "name": "Notion-Version",
+              "value": "2022-06-28"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
           ]
         },
         "options": {}
@@ -377,7 +509,10 @@
       "name": "Create Project",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [2600, 450],
+      "position": [
+        2600,
+        450
+      ],
       "credentials": {
         "httpHeaderAuth": {
           "id": "2",
@@ -398,8 +533,14 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Notion-Version", "value": "2022-06-28" },
-            { "name": "Content-Type", "value": "application/json" }
+            {
+              "name": "Notion-Version",
+              "value": "2022-06-28"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
           ]
         },
         "options": {}
@@ -408,7 +549,10 @@
       "name": "Update Project",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [2600, 750],
+      "position": [
+        2600,
+        750
+      ],
       "credentials": {
         "httpHeaderAuth": {
           "id": "2",
@@ -425,7 +569,10 @@
       "name": "Consolidate Project",
       "type": "n8n-nodes-base.function",
       "typeVersion": 1,
-      "position": [2900, 600]
+      "position": [
+        2900,
+        600
+      ]
     },
     {
       "parameters": {
@@ -435,7 +582,10 @@
       "name": "Prepare Tasks",
       "type": "n8n-nodes-base.function",
       "typeVersion": 1,
-      "position": [3150, 600]
+      "position": [
+        3150,
+        600
+      ]
     },
     {
       "parameters": {
@@ -449,8 +599,14 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Notion-Version", "value": "2022-06-28" },
-            { "name": "Content-Type", "value": "application/json" }
+            {
+              "name": "Notion-Version",
+              "value": "2022-06-28"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
           ]
         },
         "options": {}
@@ -459,7 +615,10 @@
       "name": "Query Existing Tasks",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [3400, 600],
+      "position": [
+        3400,
+        600
+      ],
       "credentials": {
         "httpHeaderAuth": {
           "id": "2",
@@ -476,7 +635,10 @@
       "name": "Diff Tasks",
       "type": "n8n-nodes-base.function",
       "typeVersion": 1,
-      "position": [3650, 600]
+      "position": [
+        3650,
+        600
+      ]
     },
     {
       "parameters": {
@@ -486,11 +648,52 @@
       "name": "Create & Close Tasks",
       "type": "n8n-nodes-base.function",
       "typeVersion": 1,
-      "position": [3900, 600],
+      "position": [
+        3900,
+        600
+      ],
       "credentials": {
         "httpHeaderAuth": {
           "id": "2",
           "name": "notion_integration"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "// Analyze open issues: detect stale, unlabeled, unassigned issues\nconst data = $json;\nconst fullName = data.full_name;\nconst issues = data.issuesToSync || [];\nconst issueAnalysis = [];\n\nconst bugKw = ['bug', 'error', 'fix', 'crash', 'broken', 'fail', 'wrong', 'problem'];\nconst featKw = ['feature', 'request', 'add', 'new', 'implement', 'support', 'enhance'];\nconst docsKw = ['doc', 'documentation', 'readme', 'typo', 'spelling'];\nconst questionKw = ['question', 'help', 'how to', 'how do'];\n\nfor (const issue of issues) {\n  const analysis = {\n    number: issue.number,\n    title: issue.title,\n    labels: issue.labels || [],\n    assignees: issue.assignees || [],\n    isStale: false,\n    isUnlabeled: false,\n    isUnassigned: false,\n    suggestedLabels: [],\n    actionsToTake: []\n  };\n\n  // Detect unlabeled issues and suggest labels based on title keywords\n  if (analysis.labels.length === 0) {\n    analysis.isUnlabeled = true;\n    const titleLower = issue.title.toLowerCase();\n    if (bugKw.some(k => titleLower.includes(k))) analysis.suggestedLabels.push('bug');\n    if (featKw.some(k => titleLower.includes(k))) analysis.suggestedLabels.push('enhancement');\n    if (docsKw.some(k => titleLower.includes(k))) analysis.suggestedLabels.push('documentation');\n    if (questionKw.some(k => titleLower.includes(k))) analysis.suggestedLabels.push('question');\n    if (analysis.suggestedLabels.length === 0) analysis.suggestedLabels.push('needs-triage');\n    analysis.actionsToTake.push({ action: 'add_labels', labels: analysis.suggestedLabels });\n  }\n\n  // Detect unassigned issues\n  if (analysis.assignees.length === 0) {\n    analysis.isUnassigned = true;\n  }\n\n  // Fetch latest comment to determine last activity date\n  try {\n    const commentsResp = await this.helpers.httpRequest({\n      method: 'GET',\n      url: `https://api.github.com/repos/${fullName}/issues/${issue.number}/comments`,\n      headers: {\n        'Authorization': `Bearer ${$credentials.httpHeaderAuth.value}`,\n        'Accept': 'application/vnd.github.v3+json',\n        'User-Agent': 'n8n-workflow'\n      },\n      qs: { per_page: 1, sort: 'created', direction: 'desc' },\n      json: true\n    });\n    await new Promise(resolve => setTimeout(resolve, 350));\n\n    const comments = Array.isArray(commentsResp) ? commentsResp : [];\n    const lastCommentDate = comments.length > 0 ? new Date(comments[0].created_at) : null;\n    const lastActivity = lastCommentDate || new Date(data.updated_at || Date.now());\n    const daysSince = Math.floor((Date.now() - lastActivity.getTime()) / (1000 * 60 * 60 * 24));\n\n    analysis.lastActivityDays = daysSince;\n    analysis.commentCount = comments.length;\n\n    // Mark as stale if no activity in 30+ days\n    if (daysSince > 30) {\n      analysis.isStale = true;\n      if (!analysis.labels.some(l => l.toLowerCase() === 'stale')) {\n        analysis.actionsToTake.push({\n          action: 'mark_stale',\n          addLabel: 'stale',\n          addComment: `This issue has been automatically marked as stale because it has not had activity in ${daysSince} days. It will be reviewed in the next triage cycle.`\n        });\n      }\n    }\n  } catch (err) {\n    analysis.commentFetchError = err.message;\n  }\n\n  issueAnalysis.push(analysis);\n}\n\nreturn [{\n  json: {\n    ...data,\n    issueAnalysis,\n    issueAnalysisStats: {\n      totalAnalyzed: issueAnalysis.length,\n      staleCount: issueAnalysis.filter(i => i.isStale).length,\n      unlabeledCount: issueAnalysis.filter(i => i.isUnlabeled).length,\n      unassignedCount: issueAnalysis.filter(i => i.isUnassigned).length,\n      actionsPlanned: issueAnalysis.reduce((s, i) => s + i.actionsToTake.length, 0)\n    }\n  }\n}];"
+      },
+      "id": "analyze-issues",
+      "name": "Analyze Issues",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        4150,
+        400
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "1",
+          "name": "github_pat"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "// Execute planned updates on GitHub issues (labels, stale comments)\nconst data = $json;\nconst fullName = data.full_name;\nconst issueAnalysis = data.issueAnalysis || [];\nconst updateResults = { labelsAdded: 0, commentsPosted: 0, errors: [] };\n\nfor (const issue of issueAnalysis) {\n  for (const action of (issue.actionsToTake || [])) {\n    try {\n      if (action.action === 'add_labels') {\n        await this.helpers.httpRequest({\n          method: 'POST',\n          url: `https://api.github.com/repos/${fullName}/issues/${issue.number}/labels`,\n          headers: {\n            'Authorization': `Bearer ${$credentials.httpHeaderAuth.value}`,\n            'Accept': 'application/vnd.github.v3+json',\n            'User-Agent': 'n8n-workflow'\n          },\n          body: { labels: action.labels },\n          json: true\n        });\n        updateResults.labelsAdded += action.labels.length;\n        await new Promise(resolve => setTimeout(resolve, 350));\n      }\n\n      if (action.action === 'mark_stale') {\n        // Add stale label\n        await this.helpers.httpRequest({\n          method: 'POST',\n          url: `https://api.github.com/repos/${fullName}/issues/${issue.number}/labels`,\n          headers: {\n            'Authorization': `Bearer ${$credentials.httpHeaderAuth.value}`,\n            'Accept': 'application/vnd.github.v3+json',\n            'User-Agent': 'n8n-workflow'\n          },\n          body: { labels: [action.addLabel] },\n          json: true\n        });\n        updateResults.labelsAdded += 1;\n        await new Promise(resolve => setTimeout(resolve, 350));\n\n        // Post stale notification comment\n        await this.helpers.httpRequest({\n          method: 'POST',\n          url: `https://api.github.com/repos/${fullName}/issues/${issue.number}/comments`,\n          headers: {\n            'Authorization': `Bearer ${$credentials.httpHeaderAuth.value}`,\n            'Accept': 'application/vnd.github.v3+json',\n            'User-Agent': 'n8n-workflow'\n          },\n          body: { body: action.addComment },\n          json: true\n        });\n        updateResults.commentsPosted += 1;\n        await new Promise(resolve => setTimeout(resolve, 350));\n      }\n    } catch (err) {\n      updateResults.errors.push(`Issue #${issue.number}: ${err.message}`);\n    }\n  }\n}\n\nreturn [{\n  json: {\n    ...data,\n    issueUpdateResults: updateResults\n  }\n}];"
+      },
+      "id": "update-github-issues",
+      "name": "Update GitHub Issues",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        4150,
+        800
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "1",
+          "name": "github_pat"
         }
       }
     },
@@ -502,7 +705,10 @@
       "name": "Prepare Resources",
       "type": "n8n-nodes-base.function",
       "typeVersion": 1,
-      "position": [4150, 600]
+      "position": [
+        4650,
+        600
+      ]
     },
     {
       "parameters": {
@@ -512,7 +718,10 @@
       "name": "Sync Resources",
       "type": "n8n-nodes-base.function",
       "typeVersion": 1,
-      "position": [4400, 600],
+      "position": [
+        4900,
+        600
+      ],
       "credentials": {
         "httpHeaderAuth": {
           "id": "2",
@@ -528,7 +737,10 @@
       "name": "Sync Snippets",
       "type": "n8n-nodes-base.function",
       "typeVersion": 1,
-      "position": [4650, 600],
+      "position": [
+        5150,
+        600
+      ],
       "credentials": {
         "httpHeaderAuth": {
           "id": "2",
@@ -544,7 +756,10 @@
       "name": "Update Project Relations",
       "type": "n8n-nodes-base.function",
       "typeVersion": 1,
-      "position": [4900, 600],
+      "position": [
+        5400,
+        600
+      ],
       "credentials": {
         "httpHeaderAuth": {
           "id": "2",
@@ -554,13 +769,16 @@
     },
     {
       "parameters": {
-        "functionCode": "// Collect per-repo results and loop back to batch\nconst data = $json;\n\n// Store this repo's summary in the workflow's static data for final aggregation\nconst staticData = $getWorkflowStaticData('global');\nif (!staticData.repoResults) {\n  staticData.repoResults = [];\n}\n\nstaticData.repoResults.push({\n  name: data.name,\n  full_name: data.full_name,\n  isNewProject: data.isNewProject,\n  recentCommitCount: data.recentCommitCount,\n  newTaskCount: data.newTaskCount || 0,\n  closedTaskCount: data.closedTaskCount || 0,\n  newResourceCount: data.newResourceCount || 0,\n  newSnippetCount: data.newSnippetCount || 0,\n  relationsWired: data.relationsWired || {},\n  errors: [\n    ...(data.taskErrors || []),\n    ...(data.resourceErrors || []),\n    ...(data.snippetErrors || []),\n    ...(data.relationUpdateErrors || [])\n  ]\n});\n\nreturn [{ json: data }];"
+        "functionCode": "// Collect per-repo results and loop back to batch\nconst data = $json;\n\n// Store this repo's summary in the workflow's static data for final aggregation\nconst staticData = $getWorkflowStaticData('global');\nif (!staticData.repoResults) {\n  staticData.repoResults = [];\n}\n\nstaticData.repoResults.push({\n  name: data.name,\n  full_name: data.full_name,\n  isNewProject: data.isNewProject,\n  recentCommitCount: data.recentCommitCount,\n  newTaskCount: data.newTaskCount || 0,\n  closedTaskCount: data.closedTaskCount || 0,\n  newResourceCount: data.newResourceCount || 0,\n  newSnippetCount: data.newSnippetCount || 0,\n  relationsWired: data.relationsWired || {},\n  issueAnalysisStats: data.issueAnalysisStats || {},\n  issueUpdateResults: data.issueUpdateResults || {},\n  errors: [\n    ...(data.taskErrors || []),\n    ...(data.resourceErrors || []),\n    ...(data.snippetErrors || []),\n    ...(data.relationUpdateErrors || []),\n    ...((data.issueUpdateResults || {}).errors || [])\n  ]\n});\n\nreturn [{ json: data }];"
       },
       "id": "collect-results",
       "name": "Collect Results",
       "type": "n8n-nodes-base.function",
       "typeVersion": 1,
-      "position": [5150, 600]
+      "position": [
+        5650,
+        600
+      ]
     },
     {
       "parameters": {
@@ -570,7 +788,10 @@
       "name": "Integrity Verification",
       "type": "n8n-nodes-base.function",
       "typeVersion": 1,
-      "position": [5600, 300],
+      "position": [
+        6100,
+        300
+      ],
       "credentials": {
         "httpHeaderAuth": {
           "id": "2",
@@ -580,236 +801,417 @@
     },
     {
       "parameters": {
-        "functionCode": "// Compile final summary report\nconst staticData = $getWorkflowStaticData('global');\nconst repoResults = staticData.repoResults || [];\nconst integrityReport = $items('Integrity Verification')[0]?.json?.integrityReport || {};\n\nconst totalRepos = repoResults.length;\nconst newProjects = repoResults.filter(r => r.isNewProject).length;\nconst updatedProjects = totalRepos - newProjects;\nconst totalNewTasks = repoResults.reduce((sum, r) => sum + (r.newTaskCount || 0), 0);\nconst totalClosedTasks = repoResults.reduce((sum, r) => sum + (r.closedTaskCount || 0), 0);\nconst totalNewResources = repoResults.reduce((sum, r) => sum + (r.newResourceCount || 0), 0);\nconst totalNewSnippets = repoResults.reduce((sum, r) => sum + (r.newSnippetCount || 0), 0);\n\nconst totalRelationsWired = repoResults.reduce((sum, r) => {\n  const rel = r.relationsWired || {};\n  return sum + (rel.tasks || 0) + (rel.resources || 0) + (rel.snippets || 0);\n}, 0);\n\nconst allErrors = repoResults.flatMap(r => r.errors || []);\n\n// Sort by commit count for activity ranking\nconst byActivity = [...repoResults]\n  .sort((a, b) => (b.recentCommitCount || 0) - (a.recentCommitCount || 0))\n  .slice(0, 5)\n  .map(r => ({ name: r.full_name, commits_last_7_days: r.recentCommitCount || 0 }));\n\nconst summary = {\n  timestamp: new Date().toISOString(),\n  totalReposAnalyzed: totalRepos,\n  projects: {\n    newAdded: newProjects,\n    updated: updatedProjects\n  },\n  tasks: {\n    newCreated: totalNewTasks,\n    markedDone: totalClosedTasks\n  },\n  resources: {\n    newCreated: totalNewResources\n  },\n  snippets: {\n    newCreated: totalNewSnippets\n  },\n  relations: {\n    totalWired: totalRelationsWired,\n    orphansFound: {\n      tasks: integrityReport.orphanTaskCount || 0,\n      resources: integrityReport.orphanResourceCount || 0,\n      snippets: integrityReport.orphanSnippetCount || 0\n    },\n    repairsPerformed: integrityReport.repairCount || 0,\n    repairDetails: integrityReport.repairs || []\n  },\n  highestActivity: byActivity,\n  errors: allErrors,\n  integrityErrors: integrityReport.errors || []\n};\n\n// Clear static data for next run\nstaticData.repoResults = [];\n\nreturn [{ json: summary }];"
+        "functionCode": "// Compile final summary report\nconst staticData = $getWorkflowStaticData('global');\nconst repoResults = staticData.repoResults || [];\nconst integrityReport = $items('Integrity Verification')[0]?.json?.integrityReport || {};\n\nconst totalRepos = repoResults.length;\nconst newProjects = repoResults.filter(r => r.isNewProject).length;\nconst updatedProjects = totalRepos - newProjects;\nconst totalNewTasks = repoResults.reduce((sum, r) => sum + (r.newTaskCount || 0), 0);\nconst totalClosedTasks = repoResults.reduce((sum, r) => sum + (r.closedTaskCount || 0), 0);\nconst totalNewResources = repoResults.reduce((sum, r) => sum + (r.newResourceCount || 0), 0);\nconst totalNewSnippets = repoResults.reduce((sum, r) => sum + (r.newSnippetCount || 0), 0);\n\nconst totalRelationsWired = repoResults.reduce((sum, r) => {\n  const rel = r.relationsWired || {};\n  return sum + (rel.tasks || 0) + (rel.resources || 0) + (rel.snippets || 0);\n}, 0);\n\n// Aggregate issue analysis metrics\nconst totalIssuesAnalyzed = repoResults.reduce((sum, r) => sum + ((r.issueAnalysisStats || {}).totalAnalyzed || 0), 0);\nconst totalStaleIssues = repoResults.reduce((sum, r) => sum + ((r.issueAnalysisStats || {}).staleCount || 0), 0);\nconst totalUnlabeledIssues = repoResults.reduce((sum, r) => sum + ((r.issueAnalysisStats || {}).unlabeledCount || 0), 0);\nconst totalUnassignedIssues = repoResults.reduce((sum, r) => sum + ((r.issueAnalysisStats || {}).unassignedCount || 0), 0);\nconst totalLabelsAdded = repoResults.reduce((sum, r) => sum + ((r.issueUpdateResults || {}).labelsAdded || 0), 0);\nconst totalCommentsPosted = repoResults.reduce((sum, r) => sum + ((r.issueUpdateResults || {}).commentsPosted || 0), 0);\n\nconst allErrors = repoResults.flatMap(r => r.errors || []);\n\n// Sort by commit count for activity ranking\nconst byActivity = [...repoResults]\n  .sort((a, b) => (b.recentCommitCount || 0) - (a.recentCommitCount || 0))\n  .slice(0, 5)\n  .map(r => ({ name: r.full_name, commits_last_7_days: r.recentCommitCount || 0 }));\n\nconst summary = {\n  timestamp: new Date().toISOString(),\n  totalReposAnalyzed: totalRepos,\n  projects: {\n    newAdded: newProjects,\n    updated: updatedProjects\n  },\n  tasks: {\n    newCreated: totalNewTasks,\n    markedDone: totalClosedTasks\n  },\n  resources: {\n    newCreated: totalNewResources\n  },\n  snippets: {\n    newCreated: totalNewSnippets\n  },\n  issueAnalysis: {\n    totalAnalyzed: totalIssuesAnalyzed,\n    staleDetected: totalStaleIssues,\n    unlabeledDetected: totalUnlabeledIssues,\n    unassignedDetected: totalUnassignedIssues,\n    labelsAdded: totalLabelsAdded,\n    staleCommentsPosted: totalCommentsPosted\n  },\n  relations: {\n    totalWired: totalRelationsWired,\n    orphansFound: {\n      tasks: integrityReport.orphanTaskCount || 0,\n      resources: integrityReport.orphanResourceCount || 0,\n      snippets: integrityReport.orphanSnippetCount || 0\n    },\n    repairsPerformed: integrityReport.repairCount || 0,\n    repairDetails: integrityReport.repairs || []\n  },\n  highestActivity: byActivity,\n  errors: allErrors,\n  integrityErrors: integrityReport.errors || []\n};\n\n// Clear static data for next run\nstaticData.repoResults = [];\n\nreturn [{ json: summary }];"
       },
       "id": "summary-report",
       "name": "Summary Report",
       "type": "n8n-nodes-base.function",
       "typeVersion": 1,
-      "position": [5900, 300]
+      "position": [
+        6400,
+        300
+      ]
     }
   ],
   "connections": {
     "Start": {
       "main": [
         [
-          { "node": "Fetch User Repos", "type": "main", "index": 0 },
-          { "node": "Fetch Org Repos", "type": "main", "index": 0 }
+          {
+            "node": "Fetch User Repos",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Fetch Org Repos",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
     "Fetch User Repos": {
       "main": [
         [
-          { "node": "Merge & Filter Repos", "type": "main", "index": 0 }
+          {
+            "node": "Merge & Filter Repos",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
     "Fetch Org Repos": {
       "main": [
         [
-          { "node": "Merge & Filter Repos", "type": "main", "index": 0 }
+          {
+            "node": "Merge & Filter Repos",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
     "Merge & Filter Repos": {
       "main": [
         [
-          { "node": "Batch Repos", "type": "main", "index": 0 }
+          {
+            "node": "Batch Repos",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
     "Batch Repos": {
       "main": [
         [
-          { "node": "Rate Limit Wait", "type": "main", "index": 0 }
+          {
+            "node": "Rate Limit Wait",
+            "type": "main",
+            "index": 0
+          }
         ],
         [
-          { "node": "Integrity Verification", "type": "main", "index": 0 }
+          {
+            "node": "Integrity Verification",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
     "Rate Limit Wait": {
       "main": [
         [
-          { "node": "Fetch Recent Commits", "type": "main", "index": 0 },
-          { "node": "Fetch Open Issues", "type": "main", "index": 0 },
-          { "node": "Fetch Open PRs", "type": "main", "index": 0 },
-          { "node": "Fetch Languages", "type": "main", "index": 0 },
-          { "node": "Fetch Branches", "type": "main", "index": 0 },
-          { "node": "Fetch Latest Release", "type": "main", "index": 0 },
-          { "node": "Fetch Root Contents", "type": "main", "index": 0 }
+          {
+            "node": "Fetch Recent Commits",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Fetch Open Issues",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Fetch Open PRs",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Fetch Languages",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Fetch Branches",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Fetch Latest Release",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Fetch Root Contents",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
     "Fetch Recent Commits": {
       "main": [
         [
-          { "node": "Aggregate Repo Data", "type": "main", "index": 0 }
+          {
+            "node": "Aggregate Repo Data",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
     "Fetch Open Issues": {
       "main": [
         [
-          { "node": "Aggregate Repo Data", "type": "main", "index": 0 }
+          {
+            "node": "Aggregate Repo Data",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
     "Fetch Open PRs": {
       "main": [
         [
-          { "node": "Aggregate Repo Data", "type": "main", "index": 0 }
+          {
+            "node": "Aggregate Repo Data",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
     "Fetch Languages": {
       "main": [
         [
-          { "node": "Aggregate Repo Data", "type": "main", "index": 0 }
+          {
+            "node": "Aggregate Repo Data",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
     "Fetch Branches": {
       "main": [
         [
-          { "node": "Aggregate Repo Data", "type": "main", "index": 0 }
+          {
+            "node": "Aggregate Repo Data",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
     "Fetch Latest Release": {
       "main": [
         [
-          { "node": "Aggregate Repo Data", "type": "main", "index": 0 }
+          {
+            "node": "Aggregate Repo Data",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
     "Fetch Root Contents": {
       "main": [
         [
-          { "node": "Aggregate Repo Data", "type": "main", "index": 0 }
+          {
+            "node": "Aggregate Repo Data",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
     "Aggregate Repo Data": {
       "main": [
         [
-          { "node": "Query Existing Project", "type": "main", "index": 0 }
+          {
+            "node": "Query Existing Project",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
     "Query Existing Project": {
       "main": [
         [
-          { "node": "Decide Project Action", "type": "main", "index": 0 }
+          {
+            "node": "Decide Project Action",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
     "Decide Project Action": {
       "main": [
         [
-          { "node": "IF New Project", "type": "main", "index": 0 }
+          {
+            "node": "IF New Project",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
     "IF New Project": {
       "main": [
         [
-          { "node": "Create Project", "type": "main", "index": 0 }
+          {
+            "node": "Create Project",
+            "type": "main",
+            "index": 0
+          }
         ],
         [
-          { "node": "Update Project", "type": "main", "index": 0 }
+          {
+            "node": "Update Project",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
     "Create Project": {
       "main": [
         [
-          { "node": "Consolidate Project", "type": "main", "index": 0 }
+          {
+            "node": "Consolidate Project",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
     "Update Project": {
       "main": [
         [
-          { "node": "Consolidate Project", "type": "main", "index": 0 }
+          {
+            "node": "Consolidate Project",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
     "Consolidate Project": {
       "main": [
         [
-          { "node": "Prepare Tasks", "type": "main", "index": 0 }
+          {
+            "node": "Prepare Tasks",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
     "Prepare Tasks": {
       "main": [
         [
-          { "node": "Query Existing Tasks", "type": "main", "index": 0 }
+          {
+            "node": "Query Existing Tasks",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
     "Query Existing Tasks": {
       "main": [
         [
-          { "node": "Diff Tasks", "type": "main", "index": 0 }
+          {
+            "node": "Diff Tasks",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
     "Diff Tasks": {
       "main": [
         [
-          { "node": "Create & Close Tasks", "type": "main", "index": 0 }
+          {
+            "node": "Create & Close Tasks",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
     "Create & Close Tasks": {
       "main": [
         [
-          { "node": "Prepare Resources", "type": "main", "index": 0 }
+          {
+            "node": "Analyze Issues",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
     "Prepare Resources": {
       "main": [
         [
-          { "node": "Sync Resources", "type": "main", "index": 0 }
+          {
+            "node": "Sync Resources",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
     "Sync Resources": {
       "main": [
         [
-          { "node": "Sync Snippets", "type": "main", "index": 0 }
+          {
+            "node": "Sync Snippets",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
     "Sync Snippets": {
       "main": [
         [
-          { "node": "Update Project Relations", "type": "main", "index": 0 }
+          {
+            "node": "Update Project Relations",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
     "Update Project Relations": {
       "main": [
         [
-          { "node": "Collect Results", "type": "main", "index": 0 }
+          {
+            "node": "Collect Results",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
     "Collect Results": {
       "main": [
         [
-          { "node": "Batch Repos", "type": "main", "index": 0 }
+          {
+            "node": "Batch Repos",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
     "Integrity Verification": {
       "main": [
         [
-          { "node": "Summary Report", "type": "main", "index": 0 }
+          {
+            "node": "Summary Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyze Issues": {
+      "main": [
+        [
+          {
+            "node": "Update GitHub Issues",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update GitHub Issues": {
+      "main": [
+        [
+          {
+            "node": "Prepare Resources",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     }
