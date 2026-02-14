@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   issues: write
 
 jobs:
@@ -37,6 +37,7 @@ jobs:
             -e N8N_ENCRYPTION_KEY=${{ secrets.N8N_ENCRYPTION_KEY }} \
             -e GITHUB_PAT=${{ secrets.GH_PAT }} \
             -e NOTION_API_KEY=${{ secrets.NOTION_API_KEY }} \
+            -e PIECES_OS_BASE_URL=${{ vars.PIECES_OS_BASE_URL || 'http://localhost:1000' }} \
             n8nio/n8n:latest \
             execute --file /home/node/.n8n/workflows/repo-analysis-sync.json \
             2>&1 | tee /tmp/n8n-output.log
