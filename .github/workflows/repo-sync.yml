@@ -27,6 +27,34 @@ jobs:
           CRED_DIR="$(pwd)/credentials" \
           ./scripts/setup-credentials.sh
 
+      - name: Debug summary – pre-flight
+        if: always()
+        run: |
+          echo "::group::n8n Docker image"
+          docker pull n8nio/n8n:latest 2>&1 | tail -5
+          docker inspect n8nio/n8n:latest --format '{{.RepoDigests}}' 2>/dev/null || true
+          echo "n8n version: $(docker run --rm n8nio/n8n:latest --version 2>&1 || echo 'unknown')"
+          echo "::endgroup::"
+
+          echo "::group::Environment config (config/n8n-config.env)"
+          # Print env file but redact any token/key values
+          sed -E 's/(TOKEN|KEY|SECRET)=.+/\1=***REDACTED***/I' config/n8n-config.env
+          echo "::endgroup::"
+
+          echo "::group::Mounted files"
+          echo "--- workflows/ ---"
+          ls -lh workflows/ 2>/dev/null || echo "(empty or missing)"
+          echo "--- credentials/ ---"
+          ls -lh credentials/ 2>/dev/null | awk '{print $5, $NF}' || echo "(empty or missing)"
+          echo "::endgroup::"
+
+          echo "::group::Secrets presence check"
+          [ -n "${{ secrets.N8N_ENCRYPTION_KEY }}" ] && echo "N8N_ENCRYPTION_KEY: set" || echo "N8N_ENCRYPTION_KEY: MISSING"
+          [ -n "${{ secrets.GH_PAT }}" ]              && echo "GH_PAT: set"              || echo "GH_PAT: MISSING"
+          [ -n "${{ secrets.NOTION_API_KEY }}" ]       && echo "NOTION_API_KEY: set"       || echo "NOTION_API_KEY: MISSING"
+          echo "PIECES_OS_BASE_URL: ${{ vars.PIECES_OS_BASE_URL || 'http://localhost:1000 (default)' }}"
+          echo "::endgroup::"
+
       - name: Execute n8n workflow
         id: run_workflow
         run: |
@@ -43,12 +71,51 @@ jobs:
             2>&1 | tee /tmp/n8n-output.log
           echo "exit_code=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
 
-      - name: Display workflow output
+      - name: Debug summary – result
         if: always()
         run: |
-          echo "=== n8n Workflow Output ==="
-          cat /tmp/n8n-output.log || echo "No output file found"
-          echo "=== End Output ==="
+          EXIT_CODE="${{ steps.run_workflow.outputs.exit_code }}"
+          echo "::group::Execution result"
+          echo "Exit code: ${EXIT_CODE:-N/A (step did not run)}"
+          echo "::endgroup::"
+
+          echo "::group::Full n8n output"
+          cat /tmp/n8n-output.log 2>/dev/null || echo "(no output captured)"
+          echo "::endgroup::"
+
+          echo "::group::Error analysis"
+          if [ -f /tmp/n8n-output.log ]; then
+            if grep -qi "error\|fatal\|exception\|failed" /tmp/n8n-output.log; then
+              echo "Errors detected in output:"
+              grep -in "error\|fatal\|exception\|failed" /tmp/n8n-output.log
+            else
+              echo "No errors detected in output."
+            fi
+          else
+            echo "No output file to analyse."
+          fi
+          echo "::endgroup::"
+
+          # GitHub Actions Job Summary (appears on the run summary page)
+          {
+            echo "## n8n Workflow Debug Summary"
+            echo ""
+            echo "| Item | Value |"
+            echo "|------|-------|"
+            echo "| Exit code | \`${EXIT_CODE:-N/A}\` |"
+            echo "| n8n image | \`n8nio/n8n:latest\` |"
+            echo "| Runner mode | \`external\` |"
+            echo "| Python enabled | \`false\` |"
+            echo ""
+            if [ -f /tmp/n8n-output.log ] && grep -qi "error\|fatal\|exception\|failed" /tmp/n8n-output.log; then
+              echo "### Errors"
+              echo '```'
+              grep -in "error\|fatal\|exception\|failed" /tmp/n8n-output.log | head -20
+              echo '```'
+            else
+              echo "No errors detected."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Create failure issue
         if: failure()
