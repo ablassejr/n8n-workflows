@@ -811,6 +811,70 @@
         6400,
         300
       ]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Fetch today's activity data from Pieces OS (local API)\n// Gracefully handles Pieces OS being unavailable\nconst piecesBaseUrl = (process.env.PIECES_OS_BASE_URL || 'http://localhost:1000').replace(/\\/$/, '');\nconst today = new Date().toISOString().split('T')[0];\nconst todayStart = new Date(today + 'T00:00:00Z');\n\nconst piecesData = {\n  piecesAvailable: false,\n  workstreamSummaries: [],\n  activities: [],\n  recentAssets: [],\n  dailySummary: ''\n};\n\ntry {\n  // Health check\n  const health = await this.helpers.httpRequest({\n    method: 'GET',\n    url: `${piecesBaseUrl}/.well-known/health`,\n    timeout: 5000\n  });\n\n  if (health === 'ok' || (typeof health === 'object' && health)) {\n    piecesData.piecesAvailable = true;\n\n    // Fetch workstream summaries (LTM roll-ups)\n    try {\n      const summariesResp = await this.helpers.httpRequest({\n        method: 'GET',\n        url: `${piecesBaseUrl}/workstream_summaries`,\n        timeout: 15000,\n        json: true\n      });\n\n      const rawSummaries = summariesResp?.iterable || [];\n      const allSummaries = Array.isArray(rawSummaries) ? rawSummaries : Object.values(rawSummaries);\n      piecesData.workstreamSummaries = allSummaries\n        .filter(s => {\n          const created = s.created?.value || s.created;\n          return created && new Date(created) >= todayStart;\n        })\n        .map(s => ({\n          id: s.id,\n          summary: s.summary?.body || s.body || '',\n          created: s.created?.value || s.created,\n          annotations: (s.annotations?.iterable || []).map(a => a.text || '')\n        }));\n    } catch (e) {\n      piecesData.summaryError = e.message;\n    }\n\n    // Fetch activities\n    try {\n      const activitiesResp = await this.helpers.httpRequest({\n        method: 'GET',\n        url: `${piecesBaseUrl}/activities`,\n        timeout: 15000,\n        json: true\n      });\n\n      const rawActivities = activitiesResp?.iterable || [];\n      const allActivities = Array.isArray(rawActivities) ? rawActivities : Object.values(rawActivities);\n      piecesData.activities = allActivities\n        .filter(a => {\n          const created = a.created?.value || a.created;\n          return created && new Date(created) >= todayStart;\n        })\n        .map(a => ({\n          id: a.id,\n          event: a.event?.name || a.event || '',\n          mechanism: a.mechanism?.value || '',\n          asset: a.asset?.name || a.asset?.id || '',\n          created: a.created?.value || a.created\n        }))\n        .slice(0, 50);\n    } catch (e) {\n      piecesData.activitiesError = e.message;\n    }\n\n    // Fetch recent assets (snippets saved today)\n    try {\n      const assetsResp = await this.helpers.httpRequest({\n        method: 'GET',\n        url: `${piecesBaseUrl}/assets`,\n        timeout: 15000,\n        json: true\n      });\n\n      const rawAssets = assetsResp?.iterable || [];\n      const allAssets = Array.isArray(rawAssets) ? rawAssets : Object.values(rawAssets);\n      piecesData.recentAssets = allAssets\n        .filter(a => {\n          const created = a.created?.value || a.created;\n          return created && new Date(created) >= todayStart;\n        })\n        .map(a => ({\n          id: a.id,\n          name: a.name || 'Untitled',\n          description: a.description || '',\n          language: a.original?.reference?.classification?.specific || '',\n          created: a.created?.value || a.created\n        }))\n        .slice(0, 20);\n    } catch (e) {\n      piecesData.assetsError = e.message;\n    }\n\n    // Build text summary from workstream summaries\n    piecesData.dailySummary = piecesData.workstreamSummaries\n      .map(s => s.summary).filter(Boolean).join('\\n\\n');\n  }\n} catch (e) {\n  piecesData.connectionError = e.message;\n}\n\n// Pass through the repo analysis summary from previous node\nconst repoSummary = $json || {};\nreturn [{\n  json: {\n    repoAnalysisSummary: repoSummary,\n    piecesData,\n    today\n  }\n}];"
+      },
+      "id": "fetch-pieces-daily-data",
+      "name": "Fetch Pieces Daily Data",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        6700,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Fetch current state of tracking-control-network repo (daily log + TASKS.md)\nconst data = $json;\nconst today = data.today || new Date().toISOString().split('T')[0];\nconst trackingRepo = 'ablassejr/tracking-control-network';\nconst dailyLogPath = `research-vault/Daily Logs/${today}.md`;\nconst tasksPath = 'TASKS.md';\n\nconst repoState = {\n  dailyLogExists: false,\n  dailyLogContent: null,\n  dailyLogSha: null,\n  tasksContent: null,\n  tasksSha: null\n};\n\nconst encodePath = (p) => p.split('/').map(s => encodeURIComponent(s)).join('/');\n\n// Fetch existing daily log (if any)\ntry {\n  const logResp = await this.helpers.httpRequest({\n    method: 'GET',\n    url: `https://api.github.com/repos/${trackingRepo}/contents/${encodePath(dailyLogPath)}`,\n    headers: {\n      'Authorization': `Bearer ${$credentials.httpHeaderAuth.value}`,\n      'Accept': 'application/vnd.github.v3+json',\n      'User-Agent': 'n8n-workflow'\n    },\n    json: true\n  });\n\n  if (logResp.content) {\n    repoState.dailyLogExists = true;\n    repoState.dailyLogContent = Buffer.from(logResp.content, 'base64').toString('utf8');\n    repoState.dailyLogSha = logResp.sha;\n  }\n} catch (e) {\n  // 404 = file doesn't exist yet, which is expected\n  if (!e.message.includes('404') && !e.message.includes('Not Found')) {\n    repoState.dailyLogError = e.message;\n  }\n}\nawait new Promise(resolve => setTimeout(resolve, 350));\n\n// Fetch TASKS.md\ntry {\n  const tasksResp = await this.helpers.httpRequest({\n    method: 'GET',\n    url: `https://api.github.com/repos/${trackingRepo}/contents/${tasksPath}`,\n    headers: {\n      'Authorization': `Bearer ${$credentials.httpHeaderAuth.value}`,\n      'Accept': 'application/vnd.github.v3+json',\n      'User-Agent': 'n8n-workflow'\n    },\n    json: true\n  });\n\n  if (tasksResp.content) {\n    repoState.tasksContent = Buffer.from(tasksResp.content, 'base64').toString('utf8');\n    repoState.tasksSha = tasksResp.sha;\n  }\n} catch (e) {\n  repoState.tasksError = e.message;\n}\n\nreturn [{\n  json: {\n    ...data,\n    trackingRepo,\n    dailyLogPath,\n    tasksPath,\n    repoState\n  }\n}];"
+      },
+      "id": "fetch-tracking-repo-state",
+      "name": "Fetch Tracking Repo State",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        7000,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "1",
+          "name": "github_pat"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "// Generate daily log content and identify task updates from Pieces + repo analysis\nconst data = $json;\nconst today = data.today || new Date().toISOString().split('T')[0];\nconst tomorrow = (() => { const d = new Date(today + 'T12:00:00Z'); d.setDate(d.getDate() + 1); return d.toISOString().split('T')[0]; })();\nconst yesterday = (() => { const d = new Date(today + 'T12:00:00Z'); d.setDate(d.getDate() - 1); return d.toISOString().split('T')[0]; })();\nconst time = new Date().toISOString().split('T')[1].substring(0, 5);\nconst pieces = data.piecesData || {};\nconst repoState = data.repoState || {};\nconst repoSummary = data.repoAnalysisSummary || {};\n\n// ---- Build rapid logging entries from Pieces data ----\nconst rapidEntries = [];\n\nif (pieces.piecesAvailable) {\n  // From workstream summaries\n  for (const summary of (pieces.workstreamSummaries || [])) {\n    if (summary.summary) {\n      const sTime = summary.created\n        ? new Date(summary.created).toISOString().split('T')[1].substring(0, 5)\n        : time;\n      const lines = summary.summary.split('\\n').filter(l => l.trim());\n      for (const line of lines.slice(0, 5)) {\n        rapidEntries.push(`*${sTime}* - ${line.trim()}`);\n      }\n    }\n  }\n\n  // From activities\n  for (const activity of (pieces.activities || []).slice(0, 10)) {\n    if (activity.event && activity.asset) {\n      const aTime = activity.created\n        ? new Date(activity.created).toISOString().split('T')[1].substring(0, 5)\n        : time;\n      rapidEntries.push(`*${aTime}* - ${activity.event}: ${activity.asset}`);\n    }\n  }\n}\n\n// Add repo analysis summary entry\nif (repoSummary.totalReposAnalyzed) {\n  const taskInfo = repoSummary.tasks || {};\n  const issueInfo = repoSummary.issueAnalysis || {};\n  rapidEntries.push(\n    `*${time}* - Ran repo analysis sync: ${repoSummary.totalReposAnalyzed} repos analyzed, ` +\n    `${taskInfo.newCreated || 0} new tasks, ${issueInfo.labelsAdded || 0} issue labels added`\n  );\n}\n\n// ---- Build code snippets section from Pieces assets ----\nconst snippetEntries = [];\nfor (const asset of (pieces.recentAssets || [])) {\n  const lang = asset.language ? ` (${asset.language})` : '';\n  const desc = asset.description ? `: ${asset.description}` : '';\n  snippetEntries.push(`- **${asset.name}**${lang}${desc}`);\n}\n\n// ---- Determine focus from Pieces summaries ----\nlet focus = 'Automated daily sync';\nif (pieces.workstreamSummaries && pieces.workstreamSummaries.length > 0) {\n  const firstSummary = pieces.workstreamSummaries[0].summary || '';\n  const firstLine = firstSummary.split('\\n').find(l => l.trim()) || '';\n  if (firstLine.length > 5) focus = firstLine.substring(0, 100);\n}\n\n// ---- Build conceptual review from Pieces summaries ----\nconst conceptEntries = [];\nif (pieces.piecesAvailable && pieces.workstreamSummaries.length > 0) {\n  for (const s of pieces.workstreamSummaries) {\n    const firstLine = (s.summary || '').split('\\n').find(l => l.trim());\n    if (firstLine) conceptEntries.push(`- ${firstLine}`);\n  }\n}\n\n// ---- Generate daily log ----\nlet dailyLog;\nif (repoState.dailyLogExists && repoState.dailyLogContent) {\n  // UPDATE existing log — append new entries to Rapid Logging section\n  dailyLog = repoState.dailyLogContent;\n\n  if (rapidEntries.length > 0) {\n    const rapidHeader = '## Rapid Logging';\n    const rapidIdx = dailyLog.indexOf(rapidHeader);\n    if (rapidIdx !== -1) {\n      const afterHeader = rapidIdx + rapidHeader.length;\n      const nextSection = dailyLog.indexOf('\\n## ', afterHeader);\n      const insertPoint = nextSection !== -1 ? nextSection : dailyLog.length;\n      dailyLog = dailyLog.slice(0, insertPoint) + '\\n' + rapidEntries.join('\\n') + '\\n' + dailyLog.slice(insertPoint);\n    }\n  }\n\n  if (snippetEntries.length > 0) {\n    const simHeader = '## Simulation Notes';\n    const simIdx = dailyLog.indexOf(simHeader);\n    if (simIdx !== -1) {\n      const afterHeader = simIdx + simHeader.length;\n      const nextSection = dailyLog.indexOf('\\n## ', afterHeader);\n      const insertPoint = nextSection !== -1 ? nextSection : dailyLog.length;\n      dailyLog = dailyLog.slice(0, insertPoint)\n        + '\\n\\n### Code Snippets (Pieces)\\n' + snippetEntries.join('\\n') + '\\n'\n        + dailyLog.slice(insertPoint);\n    }\n  }\n} else {\n  // CREATE new daily log following the Obsidian template format\n  dailyLog = `---\ntags: [daily-log, research]\ndate: ${today}\ntype: daily\nfocus: \"${focus.replace(/\"/g, '\\\\\"')}\"\nstatus: active\n---\n\n# Daily Log: ${today}\n\n> [!target] Today's Focus\n> ${focus}\n\n[[${yesterday}|Yesterday]] | [[${tomorrow}|Tomorrow]]\n\n## Active Tasks\n\n\\`\\`\\`dataview\nTASK\nFROM \"Tasks\" OR \"Plans\"\nWHERE !completed AND file.name != this.file.name\nGROUP BY file.name\n\\`\\`\\`\n\n## Rapid Logging\n\n${rapidEntries.length > 0 ? rapidEntries.join('\\n') : `*${time}* - Daily log auto-generated by n8n workflow.`}\n\n## Conceptual Review\n\n${conceptEntries.length > 0 ? conceptEntries.join('\\n') : '- No new concepts recorded today.'}\n\n## Simulation Notes\n\n${snippetEntries.length > 0\n  ? '### Code Snippets (Pieces)\\n' + snippetEntries.join('\\n')\n  : '> No simulation work recorded today.'}\n\n## Blockers & Questions\n\n> [!failure] Current Obstacles\n> *None recorded by automation.*\n\n> [!question] For Dr. Pavlo\n> *None recorded by automation.*\n\n## Evening Review\n\n- [ ] Updated Dashboard?\n- [ ] Committed to git?\n- [ ] Planned tomorrow?\n\n**Mood/Energy:** /5\n`;\n}\n\n// ---- Build task activity note for TASKS.md ----\nlet tasksUpdate = null;\nif (repoState.tasksContent) {\n  const activityNote = [\n    `\\n### Activity Log — ${today}`,\n    ''\n  ];\n\n  if (pieces.piecesAvailable && pieces.workstreamSummaries.length > 0) {\n    activityNote.push('**From Pieces Workstream:**');\n    for (const s of pieces.workstreamSummaries.slice(0, 5)) {\n      const line = (s.summary || '').split('\\n').find(l => l.trim());\n      if (line) activityNote.push(`- ${line}`);\n    }\n    activityNote.push('');\n  }\n\n  if (repoSummary.totalReposAnalyzed) {\n    activityNote.push('**From Repo Analysis:**');\n    activityNote.push(`- Analyzed ${repoSummary.totalReposAnalyzed} repositories`);\n    if ((repoSummary.tasks || {}).newCreated > 0)\n      activityNote.push(`- Created ${repoSummary.tasks.newCreated} new Notion tasks`);\n    if ((repoSummary.issueAnalysis || {}).staleDetected > 0)\n      activityNote.push(`- Detected ${repoSummary.issueAnalysis.staleDetected} stale issues`);\n    activityNote.push('');\n  }\n\n  // Append the note to TASKS.md (before the Completed section if it exists)\n  let updatedTasks = repoState.tasksContent;\n  const completedIdx = updatedTasks.indexOf('## Completed');\n  if (completedIdx !== -1) {\n    updatedTasks = updatedTasks.slice(0, completedIdx)\n      + activityNote.join('\\n') + '\\n'\n      + updatedTasks.slice(completedIdx);\n  } else {\n    updatedTasks += '\\n' + activityNote.join('\\n');\n  }\n  tasksUpdate = updatedTasks;\n}\n\nreturn [{\n  json: {\n    ...data,\n    generatedDailyLog: dailyLog,\n    updatedTasks: tasksUpdate,\n    rapidEntriesCount: rapidEntries.length,\n    snippetEntriesCount: snippetEntries.length,\n    piecesDataUsed: pieces.piecesAvailable\n  }\n}];"
+      },
+      "id": "generate-daily-updates",
+      "name": "Generate Daily Updates",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        7300,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Commit the daily log and task updates to the tracking-control-network repo\nconst data = $json;\nconst trackingRepo = data.trackingRepo;\nconst dailyLogPath = data.dailyLogPath;\nconst repoState = data.repoState || {};\nconst commitResults = { dailyLogUpdated: false, tasksUpdated: false, errors: [] };\n\nconst encodePath = (p) => p.split('/').map(s => encodeURIComponent(s)).join('/');\n\n// Commit daily log\nif (data.generatedDailyLog) {\n  try {\n    const content = Buffer.from(data.generatedDailyLog).toString('base64');\n    const body = {\n      message: `${repoState.dailyLogExists ? 'Update' : 'Create'} daily log for ${data.today} [automated]`,\n      content,\n      branch: 'main'\n    };\n    if (repoState.dailyLogSha) {\n      body.sha = repoState.dailyLogSha;\n    }\n\n    await this.helpers.httpRequest({\n      method: 'PUT',\n      url: `https://api.github.com/repos/${trackingRepo}/contents/${encodePath(dailyLogPath)}`,\n      headers: {\n        'Authorization': `Bearer ${$credentials.httpHeaderAuth.value}`,\n        'Accept': 'application/vnd.github.v3+json',\n        'User-Agent': 'n8n-workflow'\n      },\n      body,\n      json: true\n    });\n    commitResults.dailyLogUpdated = true;\n    await new Promise(resolve => setTimeout(resolve, 500));\n  } catch (e) {\n    commitResults.errors.push(`Daily log commit failed: ${e.message}`);\n  }\n}\n\n// Commit TASKS.md update\nif (data.updatedTasks && repoState.tasksSha) {\n  try {\n    const content = Buffer.from(data.updatedTasks).toString('base64');\n    await this.helpers.httpRequest({\n      method: 'PUT',\n      url: `https://api.github.com/repos/${trackingRepo}/contents/${data.tasksPath}`,\n      headers: {\n        'Authorization': `Bearer ${$credentials.httpHeaderAuth.value}`,\n        'Accept': 'application/vnd.github.v3+json',\n        'User-Agent': 'n8n-workflow'\n      },\n      body: {\n        message: `Update tasks with activity log for ${data.today} [automated]`,\n        content,\n        sha: repoState.tasksSha,\n        branch: 'main'\n      },\n      json: true\n    });\n    commitResults.tasksUpdated = true;\n  } catch (e) {\n    commitResults.errors.push(`Tasks commit failed: ${e.message}`);\n  }\n}\n\nreturn [{\n  json: {\n    trackingRepoSync: {\n      today: data.today,\n      piecesDataUsed: data.piecesDataUsed,\n      rapidEntriesCount: data.rapidEntriesCount,\n      snippetEntriesCount: data.snippetEntriesCount,\n      dailyLogUpdated: commitResults.dailyLogUpdated,\n      tasksUpdated: commitResults.tasksUpdated,\n      errors: commitResults.errors\n    }\n  }\n}];"
+      },
+      "id": "commit-tracking-repo",
+      "name": "Commit to Tracking Repo",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        7600,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "1",
+          "name": "github_pat"
+        }
+      }
     }
   ],
   "connections": {
@@ -1209,6 +1273,50 @@
         [
           {
             "node": "Prepare Resources",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Summary Report": {
+      "main": [
+        [
+          {
+            "node": "Fetch Pieces Daily Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Pieces Daily Data": {
+      "main": [
+        [
+          {
+            "node": "Fetch Tracking Repo State",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Tracking Repo State": {
+      "main": [
+        [
+          {
+            "node": "Generate Daily Updates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Daily Updates": {
+      "main": [
+        [
+          {
+            "node": "Commit to Tracking Repo",
             "type": "main",
             "index": 0
           }
